@@ -1,0 +1,15 @@
+{
+  "name": "claude-switch",
+  "version": "0.1.0",
+  "description": "Lista e troca entre sessoes do Claude Code, de qualquer diretorio.",
+  "bin": {
+    "ccsw": "./bin/ccsw.js"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
