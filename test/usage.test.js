@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert');
+
+// Fixa o idioma: sem isso a suite quebraria conforme a preferencia da maquina.
+process.env.NEXO_LANG = 'en';
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -169,7 +172,7 @@ test('relatorio avisa quando ha sessao aproximada', () => {
   ];
 
   const saida = build(amostras);
-  assert.ok(saida.includes('sem detalhe por turno'));
+  assert.ok(saida.includes('without per-turn detail'));
 });
 
 test('relatorio nao inventa valor em dinheiro', () => {
@@ -185,11 +188,11 @@ test('relatorio nao inventa valor em dinheiro', () => {
 
   const saida = build(amostras);
   assert.ok(!saida.includes('$'), 'nenhuma cifra no relatorio');
-  assert.ok(saida.includes('assinatura'), 'explica por que nao ha custo');
+  assert.ok(saida.includes('subscription'), 'explica por que nao ha custo');
 });
 
 test('lista vazia nao quebra o relatorio', () => {
-  assert.strictEqual(build([]), 'Nenhum uso de token encontrado.');
+  assert.strictEqual(build([]), 'No token usage found.');
   assert.deepStrictEqual(tabela([], { titulo: 'x' }), []);
   assert.deepStrictEqual(emptyTotals(), {
     input: 0,

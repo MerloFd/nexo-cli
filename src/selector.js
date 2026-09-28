@@ -1,3 +1,6 @@
+const { t } = require('./i18n');
+const { normalizeDir } = require('./paths');
+
 const ANSI = {
   reset: '\x1b[0m',
   dim: '\x1b[2m',
@@ -29,16 +32,28 @@ function filterItems(items, query) {
   return items.filter((item) => matches(item, terms));
 }
 
-function createState(items, { viewport = 10, columns = 80, color = true } = {}) {
+// O escopo 'local' so mostra sessoes do diretorio onde o comando rodou; o
+// 'global' mostra a maquina inteira. Ctrl+A alterna, como no /resume.
+function inScope(items, scope, cwd) {
+  if (scope !== 'local' || !cwd) return items;
+  const alvo = normalizeDir(cwd).toLowerCase();
+  return items.filter((item) => normalizeDir(item.dir).toLowerCase() === alvo);
+}
+
+function createState(items, { viewport = 10, columns = 80, color = true, cwd = null, scope = 'global' } = {}) {
+  const base = inScope(items, scope, cwd);
+
   return {
     allItems: items,
-    items,
+    items: base,
     index: 0,
     offset: 0,
     viewport: Math.max(1, viewport),
     columns: Math.max(20, columns),
     color,
     query: '',
+    cwd,
+    scope,
   };
 }
 
@@ -67,9 +82,17 @@ function move(state, delta, { wrap = false } = {}) {
   return syncOffset({ ...state, index });
 }
 
+function refine(state, { query = state.query, scope = state.scope }) {
+  const items = filterItems(inScope(state.allItems, scope, state.cwd), query);
+  return { ...state, query, scope, items, index: 0, offset: 0 };
+}
+
 function setQuery(state, query) {
-  const items = filterItems(state.allItems, query);
-  return { ...state, query, items, index: 0, offset: 0 };
+  return refine(state, { query });
+}
+
+function toggleScope(state) {
+  return refine(state, { scope: state.scope === 'global' ? 'local' : 'global' });
 }
 
 function isPrintable(key) {
@@ -117,6 +140,7 @@ function applyKey(state, key = {}) {
   const seq = key.sequence || '';
 
   if (key.ctrl && (name === 'c' || name === 'd')) return { state, action: 'cancel' };
+  if (key.ctrl && name === 'a') return { state: toggleScope(state), action: 'move' };
   if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n') {
     return selectOrNothing(state);
   }
@@ -195,11 +219,14 @@ function paint(state, code, text) {
 
 function header(state) {
   const posicao = state.items.length ? state.index + 1 : 0;
-  return paint(
-    state,
-    ANSI.bold,
-    truncate(`  Sessoes (${posicao} de ${state.items.length})`, state.columns)
-  );
+  const params = { shown: posicao, total: state.items.length };
+
+  const texto =
+    state.scope === 'local' && state.cwd
+      ? t('ui.header.scoped', { ...params, path: normalizeDir(state.cwd) })
+      : t('ui.header.global', params);
+
+  return paint(state, ANSI.bold, truncate(`  ${texto}`, state.columns));
 }
 
 // Caixa de busca sempre visivel, como no /resume: o usuario digita direto,
@@ -207,7 +234,7 @@ function header(state) {
 function searchBox(state) {
   const width = Math.max(24, Math.min(state.columns - 4, 100));
   const inner = width - 2;
-  const conteudo = state.query ? `${state.query}█` : 'Search…';
+  const conteudo = state.query ? `${state.query}█` : t('ui.search.placeholder');
   const texto = ` ⌕ ${conteudo}`;
   const preenchido = texto.length > inner ? truncate(texto, inner) : texto.padEnd(inner);
 
@@ -222,8 +249,8 @@ function searchBox(state) {
 
 function footer(state) {
   const dica = state.query
-    ? 'setas mover   Enter abrir   Esc limpa a busca'
-    : 'digite para buscar   setas mover   Enter abrir   Esc sair';
+    ? t('ui.footer.searching')
+    : t('ui.footer.idle');
   return paint(state, ANSI.dim, truncate(`  ${dica}`, state.columns));
 }
 
@@ -232,11 +259,11 @@ function render(state) {
   const lines = [header(state), ...searchBox(state)];
 
   if (items.length === 0) {
-    lines.push('', paint(state, ANSI.dim, '  nenhuma sessao corresponde a busca'), '', footer(state));
+    lines.push('', paint(state, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')), '', footer(state));
     return lines.join('\n');
   }
 
-  lines.push(offset > 0 ? paint(state, ANSI.dim, `  ↑ mais ${offset} acima`) : '');
+  lines.push(offset > 0 ? paint(state, ANSI.dim, '  ' + t('ui.scroll.up', { n: offset })) : '');
 
   const end = Math.min(offset + viewport, items.length);
   for (let i = offset; i < end; i++) {
@@ -244,7 +271,7 @@ function render(state) {
   }
 
   const abaixo = items.length - end;
-  lines.push(abaixo > 0 ? paint(state, ANSI.dim, `  ↓ mais ${abaixo} abaixo`) : '');
+  lines.push(abaixo > 0 ? paint(state, ANSI.dim, '  ' + t('ui.scroll.down', { n: abaixo })) : '');
   lines.push(footer(state));
 
   return lines.join('\n');
@@ -257,6 +284,8 @@ module.exports = {
   move,
   syncOffset,
   setQuery,
+  toggleScope,
+  inScope,
   filterItems,
   normalize,
   ANSI,

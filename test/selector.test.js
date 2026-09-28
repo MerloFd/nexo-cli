@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
+// Fixa o idioma: sem isso a suite quebraria conforme a preferencia da maquina.
+process.env.NEXO_LANG = 'en';
+
 const { createState, applyKey, render } = require('../src/selector');
 
 function items(n) {
@@ -148,10 +151,10 @@ test('caixa de busca aparece mesmo sem termo digitado', () => {
 
 test('cabecalho mostra posicao e total', () => {
   let state = createState(items(9), { viewport: 4, columns: 80, color: false });
-  assert.ok(render(state).includes('Sessoes (1 de 9)'));
+  assert.ok(render(state).includes('(1 of 9)'));
 
   state = press(state, { name: 'down' }).state;
-  assert.ok(render(state).includes('Sessoes (2 de 9)'));
+  assert.ok(render(state).includes('(2 of 9)'));
 });
 
 test('cada sessao ocupa duas linhas: rotulo em cima, metadados embaixo', () => {
@@ -220,13 +223,13 @@ test('titulo tem prioridade sobre resumo na linha', () => {
 test('render mostra indicadores de rolagem', () => {
   let state = createState(items(30), { viewport: 4, columns: 80, color: false });
   const topo = render(state);
-  assert.ok(!topo.includes('acima'));
-  assert.ok(topo.includes('abaixo'));
+  assert.ok(!topo.includes('above'));
+  assert.ok(topo.includes('below'));
 
   for (let i = 0; i < 10; i++) state = press(state, { name: 'down' }).state;
   const meio = render(state);
-  assert.ok(meio.includes('acima'));
-  assert.ok(meio.includes('abaixo'));
+  assert.ok(meio.includes('above'));
+  assert.ok(meio.includes('below'));
 });
 
 test('cores saem quando color=false', () => {
