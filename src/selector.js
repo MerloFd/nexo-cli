@@ -8,6 +8,7 @@ const ANSI = {
   cyan: '\x1b[36m',
   yellow: '\x1b[33m',
   green: '\x1b[32m',
+  white: '\x1b[97m',
 };
 
 function normalize(text) {
@@ -288,22 +289,28 @@ function ageColor(mtimeMs) {
 // So colore por segmento quando a linha cabe inteira sem cortar - cortar uma
 // string ja colorida no meio de um codigo ANSI corrompe o restante da linha.
 // Sem espaco, cai de volta no dim uniforme de sempre.
-function renderColoredMeta(state, item) {
+// Na linha selecionada, os campos que normalmente ficam apagados (dim) viram
+// branco - continuam legiveis mesmo sob o realce da selecao, em vez de somar
+// dim com o fundo/negrito da linha e ficar dificil de ler. A idade mantem a
+// propria cor (verde/ciano/amarelo/dim): ela ja carrega informacao propria,
+// nao e so um campo secundario apagado.
+function renderColoredMeta(state, item, selected) {
+  const corBase = selected ? ANSI.white : ANSI.dim;
   const segmentos = [
-    { texto: item.agent, cor: ANSI.dim },
-    { texto: formatTurns(item.turns), cor: ANSI.dim },
+    { texto: item.agent, cor: corBase },
+    { texto: formatTurns(item.turns), cor: corBase },
     { texto: item.age, cor: ageColor(item.mtime) },
-    { texto: item.branch, cor: ANSI.dim },
-    { texto: formatBytes(item.bytes), cor: ANSI.dim },
-    { texto: formatTokens(item.tokens, item.tokensKind), cor: ANSI.dim },
+    { texto: item.branch, cor: corBase },
+    { texto: formatBytes(item.bytes), cor: corBase },
+    { texto: formatTokens(item.tokens, item.tokensKind), cor: corBase },
   ].filter((s) => s.texto);
 
-  const separador = paint(state, ANSI.dim, ' · ');
+  const separador = paint(state, corBase, ' · ');
   return `    ${segmentos.map((s) => paint(state, s.cor, s.texto)).join(separador)}`;
 }
 
-// "titulo | path" na mesma linha - o path nao aparecia em lugar nenhum da
-// lista antes disso, so no painel de preview ou no --json. Trunca a partir
+// "titulo | path" na mesma linha, sempre na mesma cor um do outro - o path e
+// parte do nome da sessao, nao um dado secundario apagado. Trunca a partir
 // da direita, entao quando nao cabe e o path que corta primeiro, nunca o
 // titulo - e o titulo que ajuda a reconhecer a sessao de relance.
 function renderItem(state, item, selected) {
@@ -311,20 +318,15 @@ function renderItem(state, item, selected) {
   const label = item.title || item.summary;
   const headPlano = `${marker}${label}  |  ${item.dir}`;
   const cabeHead = headPlano.length <= state.columns;
+  const headTexto = cabeHead ? headPlano : truncate(headPlano, state.columns);
 
-  let head;
-  if (selected) {
-    head = paint(state, ANSI.bold + ANSI.cyan, cabeHead ? headPlano : truncate(headPlano, state.columns));
-  } else if (cabeHead) {
-    const separador = paint(state, ANSI.dim, '|');
-    head = `${marker}${label}  ${separador}  ${paint(state, ANSI.dim, item.dir)}`;
-  } else {
-    head = truncate(headPlano, state.columns);
-  }
+  const head = selected ? paint(state, ANSI.bold + ANSI.cyan, headTexto) : headTexto;
 
   const metaPlano = `    ${metaLine(item)}`;
   const cabeMeta = metaPlano.length <= state.columns;
-  const meta = cabeMeta ? renderColoredMeta(state, item) : paint(state, ANSI.dim, truncate(metaPlano, state.columns));
+  const meta = cabeMeta
+    ? renderColoredMeta(state, item, selected)
+    : paint(state, selected ? ANSI.white : ANSI.dim, truncate(metaPlano, state.columns));
 
   return [head, meta];
 }

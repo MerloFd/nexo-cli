@@ -4,7 +4,7 @@ const assert = require('node:assert');
 // Fixa o idioma: sem isso a suite quebraria conforme a preferencia da maquina.
 process.env.NEXO_LANG = 'en';
 
-const { createState, applyKey, render } = require('../src/selector');
+const { createState, applyKey, render, ANSI } = require('../src/selector');
 
 function items(n) {
   return Array.from({ length: n }, (_, i) => {
@@ -599,11 +599,54 @@ test('quando nao cabe, o path corta antes do titulo, nunca o contrario', () => {
   assert.ok(head.length <= 40, `linha excede a largura: ${head.length}`);
 });
 
-test('path aparece dim quando o item nao esta selecionado', () => {
+test('path usa a mesma cor do titulo quando o item nao esta selecionado (nenhuma)', () => {
   const dados = items(2);
   const state = createState(dados, { viewport: 2, columns: 90, color: true });
   const linhas = render(state).split('\n');
 
   const naoSelecionada = linhas.find((l) => l.includes('proj1'));
-  assert.ok(naoSelecionada.includes('\x1b[2m'), 'path do item nao selecionado usa dim');
+  assert.ok(!naoSelecionada.includes('\x1b['), 'sem selecao, titulo e path ficam sem cor propria, iguais entre si');
+});
+
+test('na linha selecionada, titulo e path saem no mesmo bloco de cor', () => {
+  const state = createState(items(2), { viewport: 2, columns: 90, color: true });
+  const linhas = render(state).split('\n');
+
+  const selecionada = linhas.find((l) => l.includes('> resumo'));
+  assert.ok(selecionada.includes(ANSI.bold + ANSI.cyan), 'titulo e path selecionados usam a mesma cor');
+});
+
+test('na linha selecionada, os campos apagados (agent/branch/bytes/tokens) viram branco', () => {
+  const item = {
+    dir: 'C:\\DEV',
+    sessionId: 'id1',
+    agent: 'claude',
+    age: '3d atras',
+    mtime: Date.now() - 3 * 86400000,
+    branch: 'master',
+    bytes: 1048576,
+    summary: 's',
+  };
+
+  const state = createState([item], { viewport: 1, columns: 90, color: true });
+  const meta = render(state).split('\n').find((l) => l.includes('claude'));
+
+  assert.ok(meta.includes(ANSI.white), 'campos apagados usam branco quando a linha esta selecionada');
+  assert.ok(!meta.includes(ANSI.dim), 'nao sobra dim nos campos que deveriam ter virado branco');
+});
+
+test('idade mantem a propria cor mesmo na linha selecionada, nao vira branco', () => {
+  const item = {
+    dir: 'C:\\DEV',
+    sessionId: 'id1',
+    agent: 'claude',
+    age: 'agora',
+    mtime: Date.now(),
+    summary: 's',
+  };
+
+  const state = createState([item], { viewport: 1, columns: 90, color: true });
+  const meta = render(state).split('\n').find((l) => l.includes('claude'));
+
+  assert.ok(meta.includes(ANSI.green), 'idade recente continua verde mesmo selecionada');
 });
