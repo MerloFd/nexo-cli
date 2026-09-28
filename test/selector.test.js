@@ -7,13 +7,17 @@ process.env.NEXO_LANG = 'en';
 const { createState, applyKey, render } = require('../src/selector');
 
 function items(n) {
-  return Array.from({ length: n }, (_, i) => ({
-    dir: `C:\\DEV\\proj${i}`,
-    sessionId: `id${String(i).padStart(6, '0')}`,
-    agent: 'claude',
-    age: `${i}d atras`,
-    summary: `resumo da sessao ${i}`,
-  }));
+  return Array.from({ length: n }, (_, i) => {
+    const sessionId = `id${String(i).padStart(6, '0')}`;
+    return {
+      dir: `C:\\DEV\\proj${i}`,
+      sessionId,
+      agent: 'claude',
+      age: `${i}d atras`,
+      summary: `resumo da sessao ${i}`,
+      ref: { sessionId, dir: `C:\\DEV\\proj${i}` },
+    };
+  });
 }
 
 function press(state, key) {
@@ -282,4 +286,45 @@ test('marcador de enviado some quando o item esta selecionado', () => {
   const atual = linhas.find((l) => l.includes('resumo da sessao 0'));
 
   assert.ok(atual.startsWith('> '), 'selecao tem prioridade visual sobre o check');
+});
+
+test('Tab abre o item destacado sem fechar a lista', () => {
+  const { createState, applyKey } = require('../src/selector');
+  const state = createState(items(3), { viewport: 3 });
+
+  const result = applyKey(state, { name: 'tab' });
+  assert.strictEqual(result.action, 'open-tab');
+  assert.strictEqual(result.item.sessionId, 'id000000');
+  assert.ok(result.state.sent.has('id000000'));
+});
+
+test('Tab nao move o cursor nem mexe na busca', () => {
+  const { createState, applyKey } = require('../src/selector');
+  let state = createState(items(5), { viewport: 5 });
+  state = applyKey(state, { name: 'down' }).state;
+
+  const antes = { index: state.index, query: state.query };
+  const result = applyKey(state, { name: 'tab' });
+
+  assert.strictEqual(result.state.index, antes.index);
+  assert.strictEqual(result.state.query, antes.query);
+});
+
+test('Tab em lista vazia nao quebra', () => {
+  const { createState, applyKey } = require('../src/selector');
+  const result = applyKey(createState([], { viewport: 3 }), { name: 'tab' });
+
+  assert.strictEqual(result.action, 'none');
+  assert.strictEqual(result.item, null);
+});
+
+test('Tab da sequencia funciona igual ao Ctrl+Enter da sequencia de escape', () => {
+  const { createState, applyKey, openTab } = require('../src/selector');
+  const state = createState(items(3), { viewport: 3 });
+
+  const viaTab = applyKey(state, { name: 'tab' });
+  const viaCtrlEnter = openTab(state);
+
+  assert.strictEqual(viaTab.item.sessionId, viaCtrlEnter.item.sessionId);
+  assert.deepStrictEqual([...viaTab.state.sent], [...viaCtrlEnter.state.sent]);
 });

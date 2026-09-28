@@ -68,6 +68,15 @@ function markSent(state, sessionId) {
   return { ...state, sent };
 }
 
+// Marca o item destacado como enviado e devolve a referencia original da
+// sessao para quem chamou abrir de fato. Puro: nao mexe em terminal nem
+// dispara nenhum processo, so decide QUAL item e QUE o estado passa a marcar.
+function openTab(state) {
+  const current = state.items[state.index];
+  if (!current) return { state, item: null };
+  return { state: markSent(state, current.sessionId), item: current.ref };
+}
+
 function syncOffset(state) {
   const { index, viewport, items } = state;
   let offset = state.offset;
@@ -154,6 +163,15 @@ function applyKey(state, key = {}) {
   if (key.ctrl && name === 'a') return { state: toggleScope(state), action: 'move' };
   if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n') {
     return selectOrNothing(state);
+  }
+
+  // Tab abre a sessao destacada como aba de uma unica instancia e mantem a
+  // lista aberta - a mesma coisa que Ctrl+Enter faz quando o terminal manda
+  // essa combinacao (nem todos mandam; Tab e byte simples, decodificado igual
+  // em qualquer terminal, sem depender de sequencia de escape nenhuma).
+  if (name === 'tab') {
+    const { state: next, item } = openTab(state);
+    return { state: next, action: item ? 'open-tab' : 'none', item };
   }
 
   const navigated = navigationFor(state, key);
@@ -265,12 +283,16 @@ function footer(state) {
   return paint(state, ANSI.dim, truncate(`  ${dica}`, state.columns));
 }
 
+// Uma linha em branco no topo (antes da caixa de busca) e outra no rodape
+// (antes dos atalhos) dao respiro entre o cabecalho/lista e as bordas -
+// sem isso o texto encostava direto no topo e nos atalhos ficavam grudados
+// na ultima linha da lista.
 function render(state) {
   const { items, index, offset, viewport, columns } = state;
-  const lines = [header(state), ...searchBox(state)];
+  const lines = [header(state), '', ...searchBox(state), ''];
 
   if (items.length === 0) {
-    lines.push('', paint(state, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')), '', footer(state));
+    lines.push(paint(state, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')), '', footer(state));
     return lines.join('\n');
   }
 
@@ -283,7 +305,7 @@ function render(state) {
 
   const abaixo = items.length - end;
   lines.push(abaixo > 0 ? paint(state, ANSI.dim, '  ' + t('ui.scroll.down', { n: abaixo })) : '');
-  lines.push(footer(state));
+  lines.push('', footer(state));
 
   return lines.join('\n');
 }
@@ -298,6 +320,7 @@ module.exports = {
   toggleScope,
   inScope,
   markSent,
+  openTab,
   filterItems,
   normalize,
   ANSI,

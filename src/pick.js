@@ -1,7 +1,7 @@
 const readline = require('readline');
 const { PassThrough } = require('stream');
 const { daysAgo } = require('./scanSessions');
-const { createState, applyKey, render, syncOffset, markSent } = require('./selector');
+const { createState, applyKey, render, syncOffset, openTab } = require('./selector');
 const { extractCtrlEnter } = require('./ctrlEnter');
 const { openSession } = require('./backends');
 
@@ -27,9 +27,10 @@ function toRows(sessions) {
   }));
 }
 
-// cabecalho + caixa de busca (3) + indicadores de rolagem (2) + rodape
+// cabecalho + linha em branco + caixa de busca (3) + indicadores de rolagem
+// (2) + linha em branco + rodape = 10 linhas fixas fora da lista
 function viewportFor(rows) {
-  return Math.max(1, Math.floor(((rows || 24) - 7) / 2));
+  return Math.max(1, Math.floor(((rows || 24) - 10) / 2));
 }
 
 // Ctrl+Enter abre a sessao destacada sem fechar o seletor, para juntar varias
@@ -69,7 +70,7 @@ function pickInteractive(sessions) {
     function onRawData(chunk) {
       const found = extractCtrlEnter(chunk.toString('latin1'), carry);
       carry = found.carry;
-      for (let i = 0; i < found.hits; i++) onCtrlEnter();
+      for (let i = 0; i < found.hits; i++) openHighlighted();
       if (found.remainder) decoded.write(Buffer.from(found.remainder, 'latin1'));
     }
 
@@ -100,21 +101,29 @@ function pickInteractive(sessions) {
       resolve({ chosen: result, batch });
     };
 
-    function onCtrlEnter() {
-      const item = state.items[state.index];
+    // Tab (via applyKey, teclado normal) e Ctrl+Enter (via bytes crus, quando
+    // o terminal manda essa sequencia) caem aqui: mesma acao, dois gatilhos.
+    // Tab e o caminho garantido - todo terminal decodifica um byte simples
+    // igual; Ctrl+Enter e bonus para quem tiver a sequencia de escape.
+    function openHighlighted() {
+      const { state: next, item } = openTab(state);
+      state = next;
       if (!item) return;
 
-      state = markSent(state, item.sessionId);
-      batch.push(openInBatch(item.ref));
+      batch.push(openInBatch(item));
       draw();
     }
 
     function onKeypress(_str, key) {
-      const { state: next, action } = applyKey(state, key || {});
+      const { state: next, action, item } = applyKey(state, key || {});
       state = next;
 
       if (action === 'cancel') return finish(null);
       if (action === 'select') return finish(state.items[state.index].ref);
+      if (action === 'open-tab') {
+        batch.push(openInBatch(item));
+        return draw();
+      }
       if (action === 'move') draw();
     }
 
