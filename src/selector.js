@@ -254,9 +254,14 @@ function formatTokens(tokens, kind) {
   return value;
 }
 
+function formatTurns(turns) {
+  return turns == null ? null : t('meta.turns', { n: turns });
+}
+
 function metaLine(item) {
   return [
     item.agent,
+    formatTurns(item.turns),
     item.age,
     item.branch,
     formatBytes(item.bytes),
@@ -284,6 +289,7 @@ function ageColor(mtimeMs) {
 function renderColoredMeta(state, item) {
   const segmentos = [
     { texto: item.agent, cor: ANSI.dim },
+    { texto: formatTurns(item.turns), cor: ANSI.dim },
     { texto: item.age, cor: ageColor(item.mtime) },
     { texto: item.branch, cor: ANSI.dim },
     { texto: formatBytes(item.bytes), cor: ANSI.dim },

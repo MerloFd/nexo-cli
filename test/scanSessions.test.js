@@ -179,3 +179,45 @@ test('daysAgo formata faixas de tempo', () => {
   assert.strictEqual(daysAgo(Date.now() - 4 * 86400000), '4d atras');
   assert.strictEqual(daysAgo(Date.now() + 86400000), 'agora');
 });
+
+test('conta turnos como pares de user+assistant, ignorando o resto', async () => {
+  const { countTurns } = require('../src/scanSessions');
+  const { projects, proj } = makeFixture();
+  write(proj, 'turnos.jsonl', [
+    JSON.stringify({ cwd: 'C:\DEV', sessionId: 'x' }),
+    userLine('primeira pergunta'),
+    JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: 'resposta 1' } }),
+    JSON.stringify({ type: 'mode', mode: 'normal' }),
+    userLine('segunda pergunta'),
+    JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: 'resposta 2' } }),
+    JSON.stringify({ type: 'attachment', hookName: 'x' }),
+  ]);
+
+  const turns = await countTurns(path.join(proj, 'turnos.jsonl'));
+  assert.strictEqual(turns, 4, '2 perguntas + 2 respostas, sem contar ruido');
+});
+
+test('sessao sem mensagem nenhuma tem 0 turnos, nao null', async () => {
+  const { countTurns } = require('../src/scanSessions');
+  const { proj } = makeFixture();
+  write(proj, 'vazia.jsonl', [JSON.stringify({ cwd: 'C:\DEV', sessionId: 'x' })]);
+
+  assert.strictEqual(await countTurns(path.join(proj, 'vazia.jsonl')), 0);
+});
+
+test('arquivo inexistente devolve null em vez de lancar excecao', async () => {
+  const { countTurns } = require('../src/scanSessions');
+  assert.strictEqual(await countTurns('C:\\nao\\existe\\arquivo.jsonl'), null);
+});
+
+test('scanSessions inclui turns no resultado', async () => {
+  const { projects, proj } = makeFixture();
+  write(proj, 'com-turnos.jsonl', [
+    JSON.stringify({ cwd: 'C:\DEV', sessionId: 'y' }),
+    userLine('oi'),
+    JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: 'ola' } }),
+  ]);
+
+  const [session] = await scanSessions(projects);
+  assert.strictEqual(session.turns, 2);
+});

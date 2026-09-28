@@ -215,6 +215,45 @@ function readTailMeta(filePath, fileSize) {
   };
 }
 
+// Diferente do titulo/branch/tokens (que valem o ultimo, lido so do rabo do
+// arquivo), turnos e uma CONTAGEM - exige ler o arquivo inteiro, nao so o
+// fim. Custo medido: ~380ms no maior arquivo encontrado (23MB). So compensa
+// porque o resultado entra no mesmo cache por mtime+tamanho de tudo mais:
+// paga uma vez por versao do arquivo, nunca de novo enquanto ele nao mudar.
+async function countTurns(filePath) {
+  let stream;
+  let rl;
+  let turnos = 0;
+
+  try {
+    stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+
+    for await (const line of rl) {
+      if (!line.includes('"role":"user"') && !line.includes('"role":"assistant"')) continue;
+
+      let entry;
+      try {
+        entry = JSON.parse(line);
+      } catch {
+        continue;
+      }
+
+      const role = entry.message && entry.message.role;
+      if ((entry.type === 'user' && role === 'user') || (entry.type === 'assistant' && role === 'assistant')) {
+        turnos++;
+      }
+    }
+  } catch {
+    return null;
+  } finally {
+    if (rl) rl.close();
+    if (stream) stream.destroy();
+  }
+
+  return turnos;
+}
+
 async function scanSessions(projectsDir = DEFAULT_PROJECTS_DIR, { cacheFile } = {}) {
   const sessions = [];
   if (!fs.existsSync(projectsDir)) return sessions;
@@ -261,6 +300,7 @@ async function scanSessions(projectsDir = DEFAULT_PROJECTS_DIR, { cacheFile } = 
         if (!cwd) continue;
 
         const tail = readTailMeta(filePath, stat.size);
+        const turns = await countTurns(filePath);
         const session = {
           dir: normalizeDir(cwd),
           sessionId: sessionId || path.basename(file.name, '.jsonl'),
@@ -270,8 +310,8 @@ async function scanSessions(projectsDir = DEFAULT_PROJECTS_DIR, { cacheFile } = 
           model: tail.model,
           tokens: tail.tokens,
           tokensKind: tail.tokens ? 'context' : null,
+          turns,
           bytes: stat.size,
-          filePath,
           filePath,
           summary: summary || '(sem mensagens)',
         };
@@ -306,4 +346,4 @@ function daysAgo(mtimeMs) {
   return 'agora';
 }
 
-module.exports = { scanSessions, daysAgo, DEFAULT_PROJECTS_DIR };
+module.exports = { scanSessions, daysAgo, countTurns, DEFAULT_PROJECTS_DIR };

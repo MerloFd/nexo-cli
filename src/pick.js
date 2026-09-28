@@ -19,6 +19,7 @@ function toRows(sessions) {
     age: daysAgo(s.mtime),
     mtime: s.mtime,
     branch: s.branch || null,
+    turns: typeof s.turns === 'number' ? s.turns : null,
     bytes: s.bytes || null,
     tokens: s.tokens || null,
     tokensKind: s.tokensKind || null,

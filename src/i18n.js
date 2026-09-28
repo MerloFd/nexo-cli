@@ -10,6 +10,7 @@ const MESSAGES = {
     'ui.empty.search': 'no session matches this search',
     'ui.empty.scope': 'no session in this folder - ctrl+a shows every folder',
     'ui.scroll.up': '↑ {n} above',
+    'meta.turns': '{n} turns',
     'ui.scroll.down': '↓ {n} below',
 
     'cli.noSessions': 'No agent session found.',
@@ -74,6 +75,7 @@ const MESSAGES = {
     'ui.empty.search': 'nenhuma sessao corresponde a busca',
     'ui.empty.scope': 'nenhuma sessao nesta pasta - ctrl+a mostra todas as pastas',
     'ui.scroll.up': '↑ mais {n} acima',
+    'meta.turns': '{n} turnos',
     'ui.scroll.down': '↓ mais {n} abaixo',
 
     'cli.noSessions': 'Nenhuma sessao de agente encontrada.',
