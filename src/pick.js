@@ -28,11 +28,12 @@ function toRows(sessions) {
   }));
 }
 
-// linha em branco + cabecalho + linha em branco + caixa de busca (3) +
-// indicadores de rolagem (2) + linha em branco + rodape = 11 linhas fixas
-// fora da lista
+// linha em branco + cabecalho + linha em branco + caixa de busca (3) + abas
+// de agente + indicadores de rolagem (2) + linha em branco + rodape = 12
+// linhas fixas fora da lista (a linha de abas sempre ocupa espaco, mesmo
+// vazia com um agente so - ver comentario em selector.js/filterBar)
 function viewportFor(rows) {
-  return Math.max(1, Math.floor(((rows || 24) - 11) / 2));
+  return Math.max(1, Math.floor(((rows || 24) - 12) / 2));
 }
 
 // Abre uma sessao marcada como parte do lote final, disparado pelo Enter.

@@ -56,7 +56,33 @@ function createState(items, { viewport = 10, columns = 80, color = true, cwd = n
     cwd,
     scope,
     marked: new Set(),
+    agentFilter: null,
   };
+}
+
+// Ordem de aparicao na lista geral (ja ordenada por recencia), nao alfabetica
+// - assim o agente usado mais recentemente tende a vir primeiro nas abas.
+function uniqueAgents(items) {
+  const vistos = new Set();
+  const ordem = [];
+  for (const item of items) {
+    if (!vistos.has(item.agent)) {
+      vistos.add(item.agent);
+      ordem.push(item.agent);
+    }
+  }
+  return ordem;
+}
+
+// Ctrl+Seta (nao Tab) porque Tab ja marca sessao para o lote do Enter -
+// reaproveitar Tab para isso, como o fast-resume faz, colidiria com essa
+// outra feature.
+function cycleAgentFilter(state, delta) {
+  const opcoes = [null, ...uniqueAgents(state.allItems)];
+  const atual = opcoes.indexOf(state.agentFilter);
+  const base = atual === -1 ? 0 : atual;
+  const proximo = ((base + delta) % opcoes.length + opcoes.length) % opcoes.length;
+  return refine(state, { agentFilter: opcoes[proximo] });
 }
 
 // Tab so marca ou desmarca - nada abre ate o Enter. Guardar por sessionId (nao
@@ -109,9 +135,11 @@ function move(state, delta, { wrap = false } = {}) {
   return syncOffset({ ...state, index });
 }
 
-function refine(state, { query = state.query, scope = state.scope }) {
-  const items = filterItems(inScope(state.allItems, scope, state.cwd), query);
-  return { ...state, query, scope, items, index: 0, offset: 0 };
+function refine(state, { query = state.query, scope = state.scope, agentFilter = state.agentFilter }) {
+  let items = inScope(state.allItems, scope, state.cwd);
+  if (agentFilter) items = items.filter((item) => item.agent === agentFilter);
+  items = filterItems(items, query);
+  return { ...state, query, scope, agentFilter, items, index: 0, offset: 0 };
 }
 
 function setQuery(state, query) {
@@ -171,6 +199,8 @@ function applyKey(state, key = {}) {
 
   if (key.ctrl && (name === 'c' || name === 'd')) return { state, action: 'cancel' };
   if (key.ctrl && name === 'a') return { state: toggleScope(state), action: 'move' };
+  if (key.ctrl && name === 'right') return { state: cycleAgentFilter(state, 1), action: 'move' };
+  if (key.ctrl && name === 'left') return { state: cycleAgentFilter(state, -1), action: 'move' };
   if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n') {
     return selectOrNothing(state);
   }
@@ -323,9 +353,34 @@ function footer(state) {
 // terceira, antes de tudo, afasta o cabecalho do topo do terminal. Sem essas
 // tres o texto encostava direto na borda de cima e os atalhos ficavam
 // grudados na ultima linha da lista.
+//
+// A linha de abas por agente sempre ocupa espaco no layout, mesmo vazia com
+// um agente so - senao a altura da tela mudaria conforme os dados, e o
+// calculo do viewport (feito em pick.js, sem acesso a essa lista ainda)
+// deixaria de bater com o que de fato aparece.
+function filterBar(state) {
+  const agentes = uniqueAgents(state.allItems);
+  if (agentes.length < 2) return '';
+
+  const opcoes = [{ id: null, rotulo: 'all' }, ...agentes.map((id) => ({ id, rotulo: id }))];
+  const plano = `  ${opcoes.map((o) => (state.agentFilter === o.id ? `[${o.rotulo}]` : ` ${o.rotulo} `)).join(' ')}`;
+
+  if (plano.length > state.columns) return truncate(plano, state.columns);
+
+  const colorido = opcoes
+    .map((o) =>
+      state.agentFilter === o.id
+        ? paint(state, ANSI.bold + ANSI.cyan, `[${o.rotulo}]`)
+        : paint(state, ANSI.dim, ` ${o.rotulo} `)
+    )
+    .join(' ');
+
+  return `  ${colorido}`;
+}
+
 function render(state) {
   const { items, index, offset, viewport, columns } = state;
-  const lines = ['', header(state), '', ...searchBox(state), ''];
+  const lines = ['', header(state), '', ...searchBox(state), filterBar(state), ''];
 
   if (items.length === 0) {
     lines.push(paint(state, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')), '', footer(state));
@@ -358,6 +413,8 @@ module.exports = {
   toggleMark,
   markAndAdvance,
   markedRefs,
+  uniqueAgents,
+  cycleAgentFilter,
   filterItems,
   normalize,
   ANSI,

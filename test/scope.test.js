@@ -81,3 +81,73 @@ test('escopo local sem sessao explica como sair dele', () => {
   assert.strictEqual(local.items.length, 0);
   assert.ok(render(local).includes('ctrl+a'), 'a saida sugere o atalho');
 });
+
+const { uniqueAgents, cycleAgentFilter } = require('../src/selector');
+
+const MULTI_AGENT = [
+  { dir: 'C:\DEV\App', sessionId: 'c1', agent: 'claude', age: 'agora', summary: 'um' },
+  { dir: 'C:\DEV\App', sessionId: 'x1', agent: 'codex', age: 'agora', summary: 'dois' },
+  { dir: 'C:\DEV\App', sessionId: 'o1', agent: 'opencode', age: 'agora', summary: 'tres' },
+  { dir: 'C:\DEV\App', sessionId: 'c2', agent: 'claude', age: 'agora', summary: 'quatro' },
+];
+
+test('uniqueAgents preserva a ordem de aparicao, sem repetir', () => {
+  assert.deepStrictEqual(uniqueAgents(MULTI_AGENT), ['claude', 'codex', 'opencode']);
+});
+
+test('ctrl+direita cicla pelos agentes, comecando em "todos"', () => {
+  let state = createState(MULTI_AGENT, { viewport: 5 });
+  assert.strictEqual(state.agentFilter, null);
+
+  state = applyKey(state, { name: 'right', ctrl: true }).state;
+  assert.strictEqual(state.agentFilter, 'claude');
+  assert.strictEqual(state.items.length, 2);
+
+  state = applyKey(state, { name: 'right', ctrl: true }).state;
+  assert.strictEqual(state.agentFilter, 'codex');
+  assert.strictEqual(state.items.length, 1);
+
+  state = applyKey(state, { name: 'right', ctrl: true }).state;
+  assert.strictEqual(state.agentFilter, 'opencode');
+
+  state = applyKey(state, { name: 'right', ctrl: true }).state;
+  assert.strictEqual(state.agentFilter, null, 'da volta pra todos depois do ultimo');
+  assert.strictEqual(state.items.length, 4);
+});
+
+test('ctrl+esquerda cicla para tras', () => {
+  let state = createState(MULTI_AGENT, { viewport: 5 });
+  state = applyKey(state, { name: 'left', ctrl: true }).state;
+  assert.strictEqual(state.agentFilter, 'opencode', 'de "todos" para tras vai pro ultimo agente');
+});
+
+test('filtro de agente se combina com a busca de texto', () => {
+  let state = createState(MULTI_AGENT, { viewport: 5 });
+  state = cycleAgentFilter(state, 1);
+  state = require('../src/selector').setQuery(state, 'quatro');
+
+  assert.strictEqual(state.items.length, 1);
+  assert.strictEqual(state.items[0].sessionId, 'c2');
+});
+
+test('trocar de agente reseta a selecao para o topo', () => {
+  let state = createState(MULTI_AGENT, { viewport: 5 });
+  state = applyKey(state, { name: 'down' }).state;
+  state = applyKey(state, { name: 'right', ctrl: true }).state;
+
+  assert.strictEqual(state.index, 0);
+});
+
+test('com um agente so, a barra de abas nao ocupa espaco visivel', () => {
+  const umAgente = [{ dir: 'C:\DEV', sessionId: 'c1', agent: 'claude', age: 'agora', summary: 'x' }];
+  const out = render(createState(umAgente, { viewport: 3, columns: 90, color: false }));
+  assert.ok(!out.includes('[all]'), 'sem mais de um agente, a aba nao aparece');
+});
+
+test('com varios agentes, a aba ativa aparece marcada', () => {
+  let state = createState(MULTI_AGENT, { viewport: 5, columns: 90, color: false });
+  assert.ok(render(state).includes('[all]'));
+
+  state = applyKey(state, { name: 'right', ctrl: true }).state;
+  assert.ok(render(state).includes('[claude]'));
+});
