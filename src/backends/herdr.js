@@ -11,7 +11,7 @@ function available() {
   }
 }
 
-function open(session) {
+function open(session, command) {
   const raw = execFileSync('herdr', [
     'tab', 'create',
     '--workspace', process.env.HERDR_WORKSPACE_ID,
@@ -22,12 +22,14 @@ function open(session) {
   const paneId = parsed && parsed.result && parsed.result.root_pane && parsed.result.root_pane.pane_id;
   if (!paneId) throw new Error('herdr nao retornou pane_id');
 
+  const [kind, ...args] = command;
   const agentName = `sw${Date.now().toString().slice(-6)}`;
+
   execFileSync('herdr', [
     'agent', 'start', agentName,
-    '--kind', 'claude',
+    '--kind', kind,
     '--pane', paneId,
-    '--', '-r', session.sessionId,
+    '--', ...args,
   ], { stdio: 'ignore' });
 }
 

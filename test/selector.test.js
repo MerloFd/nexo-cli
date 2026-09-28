@@ -123,16 +123,79 @@ test('lista vazia nao quebra', () => {
 });
 
 test('render marca a linha selecionada e respeita a largura', () => {
-  let state = createState(items(10), { viewport: 3, columns: 40, color: false });
+  let state = createState(items(10), { viewport: 3, columns: 80, color: false });
   state = press(state, { name: 's' }).state;
 
   const out = render(state);
   const lines = out.split('\n');
-  lines.forEach((line) => assert.ok(line.length <= 40, `linha excede 40 colunas: ${line}`));
+  lines.forEach((line) => assert.ok(line.length <= 80, `linha excede 80 colunas: ${line}`));
 
   const marked = lines.filter((l) => l.startsWith('> '));
   assert.strictEqual(marked.length, 1);
-  assert.ok(marked[0].includes('proj1'));
+  assert.ok(marked[0].includes('resumo da sessao 1'));
+});
+
+test('cada sessao ocupa duas linhas: rotulo em cima, metadados embaixo', () => {
+  const rich = [
+    {
+      dir: 'C:\\DEV',
+      sessionId: 'id1',
+      agent: 'claude',
+      age: '2d atras',
+      branch: 'master',
+      bytes: 1677721,
+      tokens: 291000,
+      tokensKind: 'context',
+      title: 'BUG GRAFICO',
+      summary: 'mensagem crua',
+    },
+  ];
+
+  const lines = render(createState(rich, { viewport: 1, columns: 90, color: false }))
+    .split('\n')
+    .filter((l) => l.trim());
+
+  const head = lines.find((l) => l.includes('BUG GRAFICO'));
+  const meta = lines.find((l) => l.includes('claude'));
+
+  assert.ok(head.startsWith('> '), 'a primeira linha traz o marcador e o rotulo');
+  assert.deepStrictEqual(meta.trim().split(' · '), [
+    'claude',
+    '2d atras',
+    'master',
+    '1.6MB',
+    '291k ctx',
+  ]);
+});
+
+test('metadados ausentes somem em vez de virar campo vazio', () => {
+  const magro = [{ dir: 'C:\\DEV', sessionId: 'id1', agent: 'codex', age: 'agora', summary: 'oi' }];
+  const out = render(createState(magro, { viewport: 1, columns: 80, color: false }));
+  const meta = out.split('\n').find((l) => l.includes('codex'));
+
+  assert.strictEqual(meta.trim(), 'codex · agora');
+});
+
+test('tokens de contexto e acumulados nao se confundem', () => {
+  const build = (tokens, tokensKind) => [
+    { dir: 'C:\\DEV', sessionId: 'i', agent: 'a', age: 'agora', summary: 's', tokens, tokensKind },
+  ];
+
+  const ctx = render(createState(build(291000, 'context'), { viewport: 1, columns: 80, color: false }));
+  const cum = render(createState(build(3672898, 'cumulative'), { viewport: 1, columns: 80, color: false }));
+
+  assert.ok(ctx.includes('291k ctx'));
+  assert.ok(cum.includes('3.7M usados'));
+});
+
+test('titulo tem prioridade sobre resumo na linha', () => {
+  const withTitle = [
+    { dir: 'C:\\DEV', sessionId: 'id1', agent: 'claude', age: 'agora', title: 'MEU TITULO', summary: 'mensagem crua' },
+  ];
+  const out = render(createState(withTitle, { viewport: 1, columns: 80, color: false }));
+
+  assert.ok(out.includes('MEU TITULO'));
+  assert.ok(!out.includes('mensagem crua'));
 });
 
 test('render mostra indicadores de rolagem', () => {

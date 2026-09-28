@@ -5,10 +5,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const CLI = path.join(__dirname, '..', 'bin', 'ccsw.js');
+const CLI = path.join(__dirname, '..', 'bin', 'nexo.js');
 
 function makeHome() {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ccsw-cli-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-cli-'));
   const proj = path.join(home, '.claude', 'projects', 'C--DEV');
   fs.mkdirSync(proj, { recursive: true });
 
@@ -40,7 +40,7 @@ function run(args, { home = makeHome(), expectFail = false } = {}) {
     HERDR_ENV: '',
     HERDR_WORKSPACE_ID: '',
     TMUX: '',
-    CCSW_FORCE_FALLBACK: '1',
+    NEXO_FORCE_FALLBACK: '1',
   };
 
   try {
@@ -54,7 +54,7 @@ function run(args, { home = makeHome(), expectFail = false } = {}) {
 }
 
 test('--help nao depende de sessoes', () => {
-  assert.match(run(['--help']), /ccsw <termo>/);
+  assert.match(run(['--help']), /nexo <termo>/);
 });
 
 test('--json devolve JSON valido', () => {
@@ -101,7 +101,7 @@ test('--open sem valor falha', () => {
 });
 
 test('sem sessoes nenhuma falha com mensagem clara', () => {
-  const vazio = fs.mkdtempSync(path.join(os.tmpdir(), 'ccsw-vazio-'));
+  const vazio = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-vazio-'));
   const out = run(['--list'], { home: vazio, expectFail: true });
   assert.match(out, /Nenhuma sessao do Claude Code encontrada/);
 });

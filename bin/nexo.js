@@ -1,18 +1,19 @@
 #!/usr/bin/env node
-const { scanSessions, daysAgo } = require('../src/scanSessions');
+const { daysAgo } = require('../src/scanSessions');
+const { scanAll } = require('../src/agents');
 const { pickSession, printPlainList } = require('../src/pick');
 const { openSession } = require('../src/backends');
 const { filterItems } = require('../src/selector');
 
-const HELP = `ccsw - troca entre sessoes do Claude Code
+const HELP = `nexo - troca entre sessoes do Claude Code
 
 Uso:
-  ccsw                lista as sessoes e abre a escolhida
-  ccsw <termo>        ja abre a lista filtrada por <termo>
-  ccsw --list         apenas imprime as sessoes
-  ccsw --json         imprime as sessoes como JSON
-  ccsw --open <id>    abre direto a sessao com esse id (aceita prefixo)
-  ccsw --help         esta ajuda
+  nexo                lista as sessoes e abre a escolhida
+  nexo <termo>        ja abre a lista filtrada por <termo>
+  nexo --list         apenas imprime as sessoes
+  nexo --json         imprime as sessoes como JSON
+  nexo --open <id>    abre direto a sessao com esse id (aceita prefixo)
+  nexo --help         esta ajuda
 
 Na lista:
   W/S, J/K, setas     mover
@@ -51,7 +52,7 @@ async function main() {
     return;
   }
 
-  const all = await scanSessions();
+  const all = await scanAll();
   if (all.length === 0) {
     console.error('Nenhuma sessao do Claude Code encontrada.');
     process.exitCode = 1;
@@ -79,8 +80,10 @@ async function main() {
 
   if (flags.json) {
     const payload = sessions.map((s) => ({
+      agent: s.agent,
       sessionId: s.sessionId,
       dir: s.dir,
+      title: s.title,
       age: daysAgo(s.mtime),
       mtime: new Date(s.mtime).toISOString(),
       summary: s.summary,

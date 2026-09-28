@@ -13,8 +13,13 @@ function normalize(text) {
     .toLowerCase();
 }
 
+// Tudo que aparece na tela precisa ser buscavel, inclusive agente e branch.
 function matches(item, terms) {
-  const haystack = normalize(`${item.dir} ${item.sessionId} ${item.summary}`);
+  const haystack = normalize(
+    [item.agent, item.dir, item.sessionId, item.branch, item.title, item.summary]
+      .filter(Boolean)
+      .join(' ')
+  );
   return terms.every((term) => haystack.includes(term));
 }
 
@@ -156,6 +161,48 @@ function truncate(text, columns) {
   return `${text.slice(0, Math.max(1, columns - 1))}…`;
 }
 
+function formatBytes(bytes) {
+  if (!bytes) return null;
+  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)}MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+}
+
+// Claude reporta o contexto ocupado agora; Codex reporta o consumo acumulado
+// da sessao. O sufixo impede que dois numeros incomparaveis leiam como iguais.
+function formatTokens(tokens, kind) {
+  if (!tokens) return null;
+  const value =
+    tokens >= 1000000 ? `${(tokens / 1000000).toFixed(1)}M` : `${Math.round(tokens / 1000)}k`;
+
+  if (kind === 'context') return `${value} ctx`;
+  if (kind === 'cumulative') return `${value} usados`;
+  return value;
+}
+
+function metaLine(item) {
+  return [
+    item.agent,
+    item.age,
+    item.branch,
+    formatBytes(item.bytes),
+    formatTokens(item.tokens, item.tokensKind),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function renderItem(state, item, selected) {
+  const marker = selected ? '> ' : '  ';
+  const label = item.title || item.summary;
+  const head = truncate(`${marker}${label}`, state.columns);
+  const meta = truncate(`    ${metaLine(item)}`, state.columns);
+
+  return [
+    selected ? paint(state, ANSI.bold + ANSI.cyan, head) : head,
+    paint(state, ANSI.dim, meta),
+  ];
+}
+
 function paint(state, code, text) {
   if (!state.color) return text;
   return `${code}${text}${ANSI.reset}`;
@@ -196,18 +243,7 @@ function render(state) {
 
   const end = Math.min(offset + viewport, items.length);
   for (let i = offset; i < end; i++) {
-    const item = items[i];
-    const selected = i === index;
-    const marker = selected ? '> ' : '  ';
-    const head = `${marker}${item.dir}   ${item.sessionId.slice(0, 8)}   ${item.age}`;
-    const body = `      ${item.summary}`;
-
-    lines.push(
-      selected
-        ? paint(state, ANSI.bold + ANSI.cyan, truncate(head, columns))
-        : truncate(head, columns)
-    );
-    lines.push(paint(state, ANSI.dim, truncate(body, columns)));
+    lines.push(...renderItem(state, items[i], i === index));
   }
 
   const below = items.length - end;

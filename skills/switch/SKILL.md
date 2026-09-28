@@ -11,30 +11,30 @@ description: >
 
 # Switch de sessoes do Claude Code
 
-Usa o CLI `ccsw` para enxergar as sessoes de **todos** os repositorios, nao so
+Usa o CLI `nexo` para enxergar as sessoes de **todos** os repositorios, nao so
 a do diretorio atual (que e a limitacao do `/resume` nativo).
 
 ## Antes de tudo: o CLI esta instalado?
 
 ```bash
-ccsw --help
+nexo --help
 ```
 
 Se falhar, avise o usuario que precisa instalar (`npm install -g .` na pasta do
-repositorio `claude-switch`) e pare por aqui.
+repositorio `nexo`) e pare por aqui.
 
 ## Listar as sessoes
 
 Sempre use `--json`, que e estavel para leitura:
 
 ```bash
-ccsw --json
+nexo --json
 ```
 
 Com termo de busca, quando o usuario descreveu o assunto:
 
 ```bash
-ccsw --json "grafico so4"
+nexo --json "grafico so4"
 ```
 
 O filtro ignora acento e caixa, casa em diretorio, id e resumo, e trata varios
@@ -56,16 +56,16 @@ Se nada casar, diga isso e sugira um termo mais curto - nao invente sessao.
 Confirme a escolha com o usuario antes de abrir (abre terminal de verdade):
 
 ```bash
-ccsw --open <sessionId>
+nexo --open <sessionId>
 ```
 
-Aceita o id completo ou um prefixo. O `ccsw` escolhe sozinho como abrir:
+Aceita o id completo ou um prefixo. O `nexo` escolhe sozinho como abrir:
 Herdr (tab nova), Windows Terminal (aba nova), tmux (janela nova) ou, sem nada
 disso, imprime o comando para o usuario colar.
 
 ## Limite importante
 
-`ccsw --open` abre a sessao em um terminal **novo**. Ele nao substitui a sessao
+`nexo --open` abre a sessao em um terminal **novo**. Ele nao substitui a sessao
 do Claude onde voce esta rodando agora - isso e impossivel de dentro dela. Se o
 usuario quiser trocar sem abrir outra janela, diga para ele sair desta sessao e
-rodar `ccsw` direto no terminal.
+rodar `nexo` direto no terminal.

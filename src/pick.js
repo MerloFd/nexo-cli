@@ -12,15 +12,20 @@ function toRows(sessions) {
   return sessions.map((s) => ({
     dir: s.dir,
     sessionId: s.sessionId,
+    agent: s.agent,
     age: daysAgo(s.mtime),
+    branch: s.branch || null,
+    bytes: s.bytes || null,
+    tokens: s.tokens || null,
+    tokensKind: s.tokensKind || null,
+    title: s.title || null,
     summary: s.summary,
     ref: s,
   }));
 }
 
 function viewportFor(rows) {
-  const available = (rows || 24) - 6;
-  return Math.max(1, Math.floor(available / 2));
+  return Math.max(1, Math.floor(((rows || 24) - 6) / 2));
 }
 
 function pickInteractive(sessions) {
@@ -79,7 +84,8 @@ function printPlainList(sessions) {
   const width = Math.max(40, (process.stdout.columns || 100) - 6);
   sessions.forEach((s, i) => {
     const idx = String(i + 1).padStart(2, ' ');
-    const summary = s.summary.length > width ? `${s.summary.slice(0, width - 1)}…` : s.summary;
+    const label = s.title || s.summary;
+    const summary = label.length > width ? `${label.slice(0, width - 1)}…` : label;
     console.log(`${idx}) ${s.dir}   ${s.sessionId.slice(0, 8)}   ${daysAgo(s.mtime)}`);
     console.log(`      ${summary}`);
   });

@@ -4,10 +4,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Sem isso a suite escreveria no cache real do usuario em ~/.nexo-cache.json.
+process.env.NEXO_NO_CACHE = '1';
+
 const { scanSessions, daysAgo } = require('../src/scanSessions');
 
 function makeFixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ccsw-test-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-test-'));
   const projects = path.join(root, 'projects');
   const proj = path.join(projects, 'C--DEV');
   fs.mkdirSync(proj, { recursive: true });
@@ -27,7 +30,7 @@ function write(dir, name, lines) {
 }
 
 test('diretorio inexistente devolve lista vazia', async () => {
-  const sessions = await scanSessions(path.join(os.tmpdir(), 'nao-existe-ccsw-xyz'));
+  const sessions = await scanSessions(path.join(os.tmpdir(), 'nao-existe-nexo-xyz'));
   assert.deepStrictEqual(sessions, []);
 });
 

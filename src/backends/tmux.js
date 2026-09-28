@@ -11,11 +11,11 @@ function available() {
   }
 }
 
-function open(session) {
+function open(session, command) {
   execFileSync('tmux', [
     'new-window',
     '-c', session.dir,
-    `claude -r ${session.sessionId}`,
+    command.join(' '),
   ], { stdio: 'inherit' });
 }
 

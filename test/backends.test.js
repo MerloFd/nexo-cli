@@ -3,7 +3,11 @@ const assert = require('node:assert');
 
 const { openSession, assertValidSession } = require('../src/backends');
 
-const valid = { dir: 'C:\\DEV', sessionId: 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268' };
+const valid = {
+  agent: 'claude',
+  dir: 'C:\\DEV',
+  sessionId: 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268',
+};
 
 function stub(name, { available = true, fail = false } = {}) {
   const calls = [];
@@ -108,7 +112,24 @@ test('todos falhando gera erro final', () => {
 test('backend real de fallback nunca quebra', () => {
   const fallback = require('../src/backends/fallback');
   assert.strictEqual(fallback.available(), true);
-  assert.doesNotThrow(() => fallback.open(valid));
+  assert.doesNotThrow(() => fallback.open(valid, ['claude', '-r', valid.sessionId]));
+});
+
+test('cada agente recebe seu proprio comando de resume', () => {
+  const spy = stub('spy');
+
+  const claude = openSession(valid, [spy]);
+  assert.deepStrictEqual(claude.command, ['claude', '-r', valid.sessionId]);
+
+  const codex = openSession({ agent: 'codex', dir: 'C:\\DEV', sessionId: '019eb695-3961-7310' }, [spy]);
+  assert.deepStrictEqual(codex.command, ['codex', 'resume', '019eb695-3961-7310']);
+});
+
+test('agente desconhecido falha em vez de chutar um comando', () => {
+  assert.throws(
+    () => openSession({ agent: 'inexistente', dir: 'C:\\DEV', sessionId: 'abc12345' }, [stub('x')]),
+    /Agente desconhecido/
+  );
 });
 
 test('herdr fica indisponivel sem as variaveis de ambiente', () => {

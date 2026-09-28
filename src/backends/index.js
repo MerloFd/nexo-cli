@@ -2,6 +2,7 @@ const herdr = require('./herdr');
 const windowsTerminal = require('./windowsTerminal');
 const tmux = require('./tmux');
 const fallback = require('./fallback');
+const { resumeArgs } = require('../agents');
 
 const BACKENDS = [herdr, windowsTerminal, tmux, fallback];
 
@@ -21,9 +22,10 @@ function assertValidSession(session) {
 
 function openSession(session, backends = BACKENDS) {
   assertValidSession(session);
+  const command = resumeArgs(session);
 
-  // CCSW_FORCE_FALLBACK existe para os testes nao abrirem terminais de verdade.
-  const chain = process.env.CCSW_FORCE_FALLBACK ? [fallback] : backends;
+  // NEXO_FORCE_FALLBACK existe para os testes nao abrirem terminais de verdade.
+  const chain = process.env.NEXO_FORCE_FALLBACK ? [fallback] : backends;
 
   const failures = [];
   for (const backend of chain) {
@@ -36,8 +38,8 @@ function openSession(session, backends = BACKENDS) {
     if (!usable) continue;
 
     try {
-      backend.open(session);
-      return { backend: backend.name, failures };
+      backend.open(session, command);
+      return { backend: backend.name, command, failures };
     } catch (err) {
       failures.push(`${backend.name}: ${err.message}`);
     }

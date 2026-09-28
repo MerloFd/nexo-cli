@@ -13,7 +13,7 @@ test('toRows converte sessoes em linhas renderizaveis', () => {
 
 test('viewport nunca fica menor que 1, mesmo em terminal minusculo', () => {
   assert.strictEqual(viewportFor(1), 1);
-  assert.strictEqual(viewportFor(5), 1);
+  assert.strictEqual(viewportFor(6), 1);
   assert.strictEqual(viewportFor(26), 10);
   assert.strictEqual(viewportFor(undefined), 9);
 });

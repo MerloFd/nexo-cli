@@ -1,5 +1,5 @@
 {
-  "name": "claude-switch",
+  "name": "nexo",
   "version": "0.1.0",
   "description": "Lista as sessoes do Claude Code de todos os repositorios e abre a escolhida em um terminal novo, ja resumida.",
   "author": {

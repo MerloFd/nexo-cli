@@ -10,11 +10,12 @@ function available() {
   }
 }
 
-function open(session) {
+function open(session, command) {
   const child = spawn('wt.exe', [
     'new-tab',
+    '-w', '0',
     '-d', session.dir,
-    'powershell', '-NoExit', '-Command', `claude -r ${session.sessionId}`,
+    'powershell', '-NoExit', '-Command', command.join(' '),
   ], { detached: true, stdio: 'ignore' });
   child.unref();
 }

@@ -1,15 +1,15 @@
-# claude-switch (ccsw)
+# nexo
 
-Lista as sessoes do Claude Code de qualquer pasta do sistema e abre a escolhida
-em um terminal novo, ja rodando `claude -r <sessionId>` no diretorio correto.
+Lista as sessoes de agentes de IA de terminal (Claude Code, Codex) de qualquer
+pasta do sistema e abre a escolhida em um terminal novo, ja retomada.
 
 Nao precisa estar dentro de uma sessao do Claude para usar.
 
 ## Instalar
 
 ```
-git clone <repo> claude-switch
-cd claude-switch
+git clone <repo> nexo
+cd nexo
 npm install -g .
 ```
 
@@ -20,10 +20,10 @@ npm install -g .
 De qualquer terminal, qualquer pasta:
 
 ```
-ccsw               lista as sessoes e abre a escolhida
-ccsw spec-kit      ja abre a lista filtrada por "spec-kit"
-ccsw --list        apenas imprime as sessoes
-ccsw --help        ajuda
+nexo               lista as sessoes e abre a escolhida
+nexo spec-kit      ja abre a lista filtrada por "spec-kit"
+nexo --list        apenas imprime as sessoes
+nexo --help        ajuda
 ```
 
 ### Navegacao
@@ -72,13 +72,13 @@ O CLI e a interface principal e funciona sem o Claude aberto. Para quem ja esta
 dentro de uma sessao, o repositorio tambem e um plugin com a skill `/switch`:
 
 ```
-/plugin marketplace add <usuario>/claude-switch
-/plugin install claude-switch
+/plugin marketplace add <usuario>/nexo
+/plugin install nexo
 ```
 
 Com isso o Claude responde a coisas como "em que eu estava trabalhando sexta?"
-ou "abre aquela sessao do grafico do SO4", usando `ccsw --json` para procurar e
-`ccsw --open <id>` para abrir.
+ou "abre aquela sessao do grafico do SO4", usando `nexo --json` para procurar e
+`nexo --open <id>` para abrir.
 
 A skill abre a sessao em um terminal **novo** - nenhuma skill consegue
 substituir a sessao do Claude que esta rodando.
@@ -86,9 +86,21 @@ substituir a sessao do Claude que esta rodando.
 ## Como funciona
 
 Le os arquivos `~/.claude/projects/*/*.jsonl` (formato do Claude Code) e extrai
-`cwd`, `sessionId` e a primeira mensagem real do usuario como resumo -
-mensagens automaticas (`<ide_opened_file>`, caveats, continuacao de contexto)
-sao puladas.
+`cwd`, `sessionId` e um rotulo para a sessao.
+
+O rotulo, em ordem de prioridade:
+
+1. `custom-title` - o nome dado no `/rename`
+2. `ai-title` - o nome gerado automaticamente pelo Claude
+3. a primeira mensagem real do usuario, pulando as automaticas
+   (`<ide_opened_file>`, caveats, continuacao de contexto)
+
+O caminho do projeto vem do campo `cwd` de dentro do arquivo, e nao do nome da
+pasta: `C--DEV-SO5-SO5-Back-End` e ambiguo demais para decodificar de volta.
+
+Os titulos sao reescritos ao longo de todo o arquivo, entao o atual e o ultimo.
+Para nao reler 150MB a cada chamada, so os ultimos 64KB de cada arquivo sao
+lidos - custo medido de ~50ms para a base inteira.
 
 Ids de sessao passam por validacao (`[A-Za-z0-9_-]{4,64}`) antes de chegar em
 qualquer comando de shell.

@@ -1,13 +1,13 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "claude-switch",
+  "name": "nexo",
   "description": "Switcher global de sessoes do Claude Code entre repositorios.",
   "owner": {
     "name": "Matheus Merlo"
   },
   "plugins": [
     {
-      "name": "claude-switch",
+      "name": "nexo",
       "description": "Lista as sessoes de todos os repositorios e abre a escolhida ja resumida.",
       "source": "./",
       "category": "productivity"

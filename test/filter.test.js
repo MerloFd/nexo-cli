@@ -201,3 +201,24 @@ test('dica muda conforme o modo', () => {
   const filtering = applyKey(nav, { sequence: '/', name: 'slash' }).state;
   assert.ok(render(filtering).includes('digite para filtrar'));
 });
+
+test('filtra por agente, que aparece na tela', () => {
+  const mix = [
+    { dir: 'C:\DEV', sessionId: 'a1', agent: 'claude', age: 'agora', summary: 'um' },
+    { dir: 'C:\DEV', sessionId: 'b2', agent: 'codex', age: 'agora', summary: 'dois' },
+  ];
+
+  assert.strictEqual(filterItems(mix, 'codex').length, 1);
+  assert.strictEqual(filterItems(mix, 'codex')[0].sessionId, 'b2');
+  assert.strictEqual(filterItems(mix, 'claude').length, 1);
+});
+
+test('filtra por branch, que aparece na tela', () => {
+  const mix = [
+    { dir: 'C:\DEV', sessionId: 'a1', agent: 'claude', age: 'agora', branch: 'master', summary: 'um' },
+    { dir: 'C:\DEV', sessionId: 'b2', agent: 'claude', age: 'agora', branch: 'frete-refactor', summary: 'dois' },
+  ];
+
+  assert.strictEqual(filterItems(mix, 'frete').length, 1);
+  assert.strictEqual(filterItems(mix, 'frete')[0].sessionId, 'b2');
+});
