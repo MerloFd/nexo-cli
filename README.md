@@ -79,11 +79,22 @@ From the most capable option to the least:
 | Environment | Result |
 | --- | --- |
 | Herdr | new tab |
+| WezTerm | new tab |
+| kitty | new tab (needs `allow_remote_control yes` in kitty.conf) |
+| iTerm2 | new tab |
 | Windows Terminal | new tab |
 | tmux | new window |
 | classic cmd / PowerShell | new window |
+| GNOME Terminal | new tab |
+| Konsole | new tab (needs "Run all Konsole windows in a single process") |
+| Xfce Terminal | new tab |
+| Terminal.app | new window (no reliable way to force a tab without extra permissions) |
 | anything else | prints the ready command |
 
+WezTerm, kitty and iTerm2 are detected by an environment variable that only
+exists when you're actually running inside them — a near-certain match.
+GNOME Terminal, Konsole and Xfce Terminal are only detected by checking if
+the program is installed, which is a guess if more than one is present.
 None of them is required, and if one fails the next takes over.
 
 Inside the VS Code integrated terminal the session opens in an external

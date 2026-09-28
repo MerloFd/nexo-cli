@@ -1,13 +1,36 @@
 const herdr = require('./herdr');
+const wezterm = require('./wezterm');
+const kitty = require('./kitty');
+const iterm2 = require('./iterm2');
 const windowsTerminal = require('./windowsTerminal');
 const tmux = require('./tmux');
 const windowsConsole = require('./windowsConsole');
+const gnomeTerminal = require('./gnomeTerminal');
+const konsole = require('./konsole');
+const xfce4Terminal = require('./xfce4Terminal');
+const terminalApp = require('./terminalApp');
 const fallback = require('./fallback');
 const { resumeArgs } = require('../agents');
 
-// Do mais capaz para o menos: quem abre aba vem antes de quem so abre janela,
-// e imprimir o comando e o ultimo recurso.
-const BACKENDS = [herdr, windowsTerminal, tmux, windowsConsole, fallback];
+// Do mais certo para o menos certo. wezterm/kitty/iTerm2 prova por variavel de
+// ambiente que E aquele terminal rodando agora, nao so que o binario existe -
+// vem antes dos que so adivinham pela presenca do programa no PATH
+// (gnome-terminal/konsole/xfce4-terminal). Quem abre aba vem antes de quem so
+// abre janela, e imprimir o comando e o ultimo recurso.
+const BACKENDS = [
+  herdr,
+  wezterm,
+  kitty,
+  iterm2,
+  windowsTerminal,
+  tmux,
+  windowsConsole,
+  gnomeTerminal,
+  konsole,
+  xfce4Terminal,
+  terminalApp,
+  fallback,
+];
 
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{4,64}$/;
 
