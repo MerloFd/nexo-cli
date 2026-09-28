@@ -245,3 +245,79 @@ test('herdr abre a aba com execFileSync mas inicia o agente em segundo plano', (
   if (antes === undefined) delete process.env.HERDR_WORKSPACE_ID;
   else process.env.HERDR_WORKSPACE_ID = antes;
 });
+
+test('windows-terminal usa accessSync (X_OK) no caminho conhecido, sem spawnar processo', (t) => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const cp = require('child_process');
+
+  // Um App Execution Alias (onde o wt.exe da Store realmente mora) e um
+  // reparse point de 0 bytes: fs.existsSync/statSync levam EACCES e falham
+  // silenciosamente. So accessSync(X_OK) enxerga esse arquivo - confirmado
+  // ao vivo antes de escrever este teste. Aqui simulamos so a parte
+  // observavel: com o arquivo presente, nao pode chamar "where" (subprocesso).
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-wt-'));
+  const appsDir = path.join(dir, 'Microsoft', 'WindowsApps');
+  fs.mkdirSync(appsDir, { recursive: true });
+  fs.writeFileSync(path.join(appsDir, 'wt.exe'), '');
+
+  const execFileSyncMock = t.mock.method(cp, 'execFileSync', () => {
+    throw new Error('nao deveria spawnar processo quando o caminho rapido ja resolveu');
+  });
+
+  const antes = { plat: process.platform, local: process.env.LOCALAPPDATA };
+  Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+  process.env.LOCALAPPDATA = dir;
+
+  delete require.cache[require.resolve('../src/backends/windowsTerminal')];
+  const windowsTerminal = require('../src/backends/windowsTerminal');
+
+  assert.strictEqual(windowsTerminal.available(), true);
+  assert.strictEqual(execFileSyncMock.mock.calls.length, 0, 'caminho rapido nao deveria precisar do "where"');
+
+  Object.defineProperty(process, 'platform', { value: antes.plat, configurable: true });
+  if (antes.local === undefined) delete process.env.LOCALAPPDATA;
+  else process.env.LOCALAPPDATA = antes.local;
+});
+
+test('windows-terminal cai para "where" quando o caminho conhecido nao existe', (t) => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const cp = require('child_process');
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-wt-vazio-'));
+  const execFileSyncMock = t.mock.method(cp, 'execFileSync', () => '');
+
+  const antes = { plat: process.platform, local: process.env.LOCALAPPDATA };
+  Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+  process.env.LOCALAPPDATA = dir;
+
+  delete require.cache[require.resolve('../src/backends/windowsTerminal')];
+  const windowsTerminal = require('../src/backends/windowsTerminal');
+
+  assert.strictEqual(windowsTerminal.available(), true);
+  assert.strictEqual(execFileSyncMock.mock.calls.length, 1, 'sem o arquivo, precisa do fallback');
+  assert.deepStrictEqual(execFileSyncMock.mock.calls[0].arguments[1], ['wt.exe']);
+
+  Object.defineProperty(process, 'platform', { value: antes.plat, configurable: true });
+  if (antes.local === undefined) delete process.env.LOCALAPPDATA;
+  else process.env.LOCALAPPDATA = antes.local;
+});
+
+test('windows-terminal nao existe fora do Windows, nem tenta checar', (t) => {
+  const cp = require('child_process');
+  const execFileSyncMock = t.mock.method(cp, 'execFileSync', () => '');
+
+  const antes = process.platform;
+  Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+
+  delete require.cache[require.resolve('../src/backends/windowsTerminal')];
+  const windowsTerminal = require('../src/backends/windowsTerminal');
+
+  assert.strictEqual(windowsTerminal.available(), false);
+  assert.strictEqual(execFileSyncMock.mock.calls.length, 0);
+
+  Object.defineProperty(process, 'platform', { value: antes, configurable: true });
+});
