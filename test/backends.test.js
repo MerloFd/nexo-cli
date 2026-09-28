@@ -156,3 +156,31 @@ test('tmux fica indisponivel fora de sessao tmux', () => {
   assert.strictEqual(tmux.available(), false);
   if (before !== undefined) process.env.TMUX = before;
 });
+
+test('console classico do Windows so entra sem Windows Terminal', () => {
+  const win = require('../src/backends/windowsConsole');
+  const before = { plat: process.platform, wt: process.env.WT_SESSION };
+
+  Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+
+  process.env.WT_SESSION = 'abc';
+  assert.strictEqual(win.available(), false, 'com WT ativo, quem abre aba tem prioridade');
+
+  delete process.env.WT_SESSION;
+  assert.strictEqual(win.available(), true, 'sem WT, abre janela nova');
+
+  Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+  assert.strictEqual(win.available(), false, 'nao existe fora do Windows');
+
+  Object.defineProperty(process, 'platform', { value: before.plat, configurable: true });
+  if (before.wt !== undefined) process.env.WT_SESSION = before.wt;
+});
+
+test('a cadeia prefere aba a janela, e janela a imprimir comando', () => {
+  const { BACKENDS } = require('../src/backends');
+  const ordem = BACKENDS.map((b) => b.name);
+
+  assert.ok(ordem.indexOf('windows-terminal') < ordem.indexOf('windows-console'), 'aba antes de janela');
+  assert.ok(ordem.indexOf('windows-console') < ordem.indexOf('fallback'), 'janela antes do fallback');
+  assert.strictEqual(ordem[ordem.length - 1], 'fallback', 'fallback e sempre o ultimo');
+});

@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const readline = require('readline');
 const cache = require('./cache');
+const { normalizeDir } = require('./paths');
 
 const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 
@@ -261,7 +262,7 @@ async function scanSessions(projectsDir = DEFAULT_PROJECTS_DIR, { cacheFile } = 
 
         const tail = readTailMeta(filePath, stat.size);
         const session = {
-          dir: cwd,
+          dir: normalizeDir(cwd),
           sessionId: sessionId || path.basename(file.name, '.jsonl'),
           mtime: stat.mtimeMs,
           title: tail.title || null,
@@ -270,6 +271,8 @@ async function scanSessions(projectsDir = DEFAULT_PROJECTS_DIR, { cacheFile } = 
           tokens: tail.tokens,
           tokensKind: tail.tokens ? 'context' : null,
           bytes: stat.size,
+          filePath,
+          filePath,
           summary: summary || '(sem mensagens)',
         };
 

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { normalizeDir } = require('../paths');
 
 const CODEX_HOME = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
 
@@ -37,10 +38,6 @@ function openSnapshot(dbPath) {
   }
 
   return { db: new DatabaseSync(snapshot, { readOnly: true }), snapshot };
-}
-
-function normalizeDir(dir) {
-  return String(dir || '').replace(/^\\\\\?\\/, '');
 }
 
 function fileSize(filePath) {
@@ -84,6 +81,8 @@ function scanSqlite(home) {
       tokens: Number(row.tokens_used) || null,
       tokensKind: row.tokens_used ? 'cumulative' : null,
       bytes: fileSize(row.rollout_path),
+      filePath: row.rollout_path || null,
+      filePath: row.rollout_path || null,
     }));
   } catch {
     return null;
@@ -188,6 +187,7 @@ function scanRollouts(home) {
           title: titles.get(meta.id) || null,
           summary: titles.get(meta.id) || '(sem mensagens)',
           mtime: fs.statSync(filePath).mtimeMs,
+          filePath,
         };
       } catch {
         return null;

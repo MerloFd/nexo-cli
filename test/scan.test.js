@@ -1,0 +1,154 @@
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const { scanFile, groupFindings, mask, matchRules } = require('../src/scan');
+const { isPlaceholder } = require('../src/scan/patterns');
+const { shannon, entropyFindings } = require('../src/scan/entropy');
+
+// Valores sinteticos: formato valido, conteudo inventado.
+const FAKE = {
+  aws: 'AKIAQQQQWWWWEEEERRRR',
+  github: 'ghp_ZZZZ1111YYYY2222XXXX3333WWWW4444VVVV',
+  anthropic: 'sk-ant-QQQQWWWWEEEERRRRTTTTYYYY',
+  google: 'AIzaQQQQWWWWEEEERRRRTTTTYYYYUUUUIIIIOOO',
+  jwt: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.QQQQWWWWEEEERRRRTTTT',
+  conexao: 'mysql://raiz:Zx9Kq2Lm8Pw4@db.interno:3306/loja',
+};
+
+function escrever(linhas) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-scan-'));
+  const file = path.join(dir, 'sessao.jsonl');
+  fs.writeFileSync(file, linhas.join('\n'), 'utf8');
+  return file;
+}
+
+function regras(texto) {
+  return matchRules(texto).map((f) => f.rule);
+}
+
+test('reconhece credenciais de formato conhecido', () => {
+  assert.ok(regras(`chave: ${FAKE.aws}`).includes('aws-access-key'));
+  assert.ok(regras(`token ${FAKE.github}`).includes('github-token'));
+  assert.ok(regras(`key ${FAKE.anthropic}`).includes('anthropic-key'));
+  assert.ok(regras(`g ${FAKE.google}`).includes('google-api-key'));
+  assert.ok(regras(`t ${FAKE.jwt}`).includes('jwt'));
+  assert.ok(regras(`db ${FAKE.conexao}`).includes('connection-string'));
+  assert.ok(regras('-----BEGIN RSA PRIVATE KEY-----').includes('private-key'));
+});
+
+test('pega credencial literal de banco no codigo', () => {
+  const codigo = 'new mysqli("localhost", "raiz_admin", "Zx9Kq2Lm8Pw4", "loja")';
+  assert.ok(regras(codigo).includes('mysqli-literal'));
+});
+
+test('regras de formato conhecido sao de alta confianca', () => {
+  const achados = matchRules(`chave: ${FAKE.aws}`);
+  assert.strictEqual(achados[0].confidence, 'alta');
+});
+
+test('placeholder de documentacao nao vira achado', () => {
+  ['xxxxxxxx', 'your-token-here', 'changeme', 'SUA_CHAVE', '<seu-token>', '${API_KEY}', '%TOKEN%']
+    .forEach((v) => assert.ok(isPlaceholder(v), `deveria ignorar: ${v}`));
+});
+
+test('codigo citado nao vira achado', () => {
+  assert.ok(isPlaceholder('md5($_POST[senha])'), 'chamada de funcao');
+  assert.ok(isPlaceholder('{{API_KEY}}'), 'template');
+  assert.strictEqual(regras('password = md5($senha)').length, 0);
+});
+
+test('atribuicao de valor obvio nao vira achado', () => {
+  assert.strictEqual(regras('PASSWORD=password').length, 0);
+  assert.strictEqual(regras('SECRET=secret').length, 0);
+});
+
+test('atribuicao com valor aleatorio vira achado de media confianca', () => {
+  const achados = matchRules('DB_PASSWORD=Zx9Kq2Lm8Pw4Rt6');
+  assert.strictEqual(achados.length, 1);
+  assert.strictEqual(achados[0].confidence, 'media');
+});
+
+test('entropia de Shannon separa aleatorio de palavra', () => {
+  assert.ok(shannon('Zx9Kq2Lm8Pw4Rt6Vb3Nh7') > 3.5);
+  assert.ok(shannon('passwordpassword') < 3);
+});
+
+test('entropia so acusa perto de palavra sensivel', () => {
+  const solto = 'commit Zx9Kq2Lm8Pw4Rt6Vb3Nh7Jd5Fg1Ss';
+  const proximo = 'token: Zx9Kq2Lm8Pw4Rt6Vb3Nh7Jd5Fg1Ss';
+
+  assert.strictEqual(entropyFindings(solto).length, 0, 'sem contexto, nao acusa');
+  assert.strictEqual(entropyFindings(proximo).length, 1, 'com contexto, acusa');
+});
+
+test('ruido conhecido nao vira achado de entropia', () => {
+  const casos = [
+    'token req_011Cf5ezuh5PNGyDuJLqHchp',
+    'token 550e8400-e29b-41d4-a716-446655440000',
+    'api /home/usuario/public_html/modulos/pages/plataforma',
+    'token origin/fix-webservice-token-opcional-e-doc',
+  ];
+
+  casos.forEach((c) => assert.strictEqual(entropyFindings(c).length, 0, `deveria ignorar: ${c}`));
+});
+
+test('mascara nunca devolve o valor inteiro', () => {
+  const m = mask(FAKE.aws);
+  assert.ok(!m.includes(FAKE.aws));
+  assert.ok(m.startsWith('AKI'));
+  assert.ok(m.includes('*'));
+  assert.strictEqual(mask('curto'), '*****', 'valor curto some por completo');
+});
+
+test('varre arquivo e aponta a linha', async () => {
+  const file = escrever([
+    JSON.stringify({ type: 'user', message: { role: 'user', content: 'oi' } }),
+    JSON.stringify({ type: 'user', message: { role: 'user', content: `minha chave ${FAKE.aws}` } }),
+  ]);
+
+  const achados = await scanFile(file);
+  assert.strictEqual(achados.length, 1);
+  assert.strictEqual(achados[0].line, 2);
+  assert.strictEqual(achados[0].rule, 'aws-access-key');
+});
+
+test('texto escapado em JSON nao corrompe o valor detectado', async () => {
+  const file = escrever([
+    JSON.stringify({ message: { content: `config: "senha" e ${FAKE.aws}\\n proxima linha` } }),
+  ]);
+
+  const achados = await scanFile(file);
+  const aws = achados.find((f) => f.rule === 'aws-access-key');
+  assert.ok(aws);
+  assert.strictEqual(aws.length, FAKE.aws.length, 'nao arrastou barra de escape');
+});
+
+test('arquivo inexistente devolve lista vazia em vez de quebrar', async () => {
+  assert.deepStrictEqual(await scanFile('C:\\nao\\existe\\x.jsonl'), []);
+});
+
+test('mesmo segredo repetido vira um achado com contagem', () => {
+  const agrupado = groupFindings([
+    { line: 10, rule: 'aws-access-key', label: 'AWS', confidence: 'alta', masked: 'AKI***AA', length: 20 },
+    { line: 4, rule: 'aws-access-key', label: 'AWS', confidence: 'alta', masked: 'AKI***AA', length: 20 },
+    { line: 7, rule: 'jwt', label: 'JWT', confidence: 'alta', masked: 'eyJ***ZZ', length: 60 },
+  ]);
+
+  assert.strictEqual(agrupado.length, 2);
+  const aws = agrupado.find((f) => f.rule === 'aws-access-key');
+  assert.strictEqual(aws.occurrences, 2);
+  assert.strictEqual(aws.firstLine, 4, 'guarda a primeira ocorrencia');
+});
+
+test('alta confianca aparece antes do que precisa conferencia', () => {
+  const agrupado = groupFindings([
+    { line: 1, rule: 'high-entropy', label: 'E', confidence: 'baixa', masked: 'a***b', length: 30 },
+    { line: 2, rule: 'assignment', label: 'A', confidence: 'media', masked: 'c***d', length: 20 },
+    { line: 3, rule: 'aws-access-key', label: 'W', confidence: 'alta', masked: 'e***f', length: 20 },
+  ]);
+
+  assert.deepStrictEqual(agrupado.map((f) => f.confidence), ['alta', 'media', 'baixa']);
+});

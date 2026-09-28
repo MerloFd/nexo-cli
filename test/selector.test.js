@@ -7,6 +7,7 @@ function items(n) {
   return Array.from({ length: n }, (_, i) => ({
     dir: `C:\\DEV\\proj${i}`,
     sessionId: `id${String(i).padStart(6, '0')}`,
+    agent: 'claude',
     age: `${i}d atras`,
     summary: `resumo da sessao ${i}`,
   }));
@@ -16,43 +17,44 @@ function press(state, key) {
   return applyKey(state, key);
 }
 
-test('S e seta pra baixo descem', () => {
+test('setas navegam a lista', () => {
   let state = createState(items(5), { viewport: 3 });
-  state = press(state, { name: 's' }).state;
+  state = press(state, { name: 'down' }).state;
   assert.strictEqual(state.index, 1);
   state = press(state, { name: 'down' }).state;
   assert.strictEqual(state.index, 2);
-});
-
-test('W e seta pra cima sobem', () => {
-  let state = createState(items(5), { viewport: 3 });
-  state = press(state, { name: 's' }).state;
-  state = press(state, { name: 's' }).state;
-  state = press(state, { name: 'w' }).state;
-  assert.strictEqual(state.index, 1);
   state = press(state, { name: 'up' }).state;
+  assert.strictEqual(state.index, 1);
+});
+
+test('ctrl+n e ctrl+p navegam', () => {
+  let state = createState(items(5), { viewport: 3 });
+  state = press(state, { name: 'n', ctrl: true }).state;
+  assert.strictEqual(state.index, 1);
+  state = press(state, { name: 'p', ctrl: true }).state;
   assert.strictEqual(state.index, 0);
 });
 
-test('vim keys j/k tambem funcionam', () => {
+test('letras NAO navegam: viram busca', () => {
   let state = createState(items(5), { viewport: 3 });
-  state = press(state, { name: 'j' }).state;
-  assert.strictEqual(state.index, 1);
-  state = press(state, { name: 'k' }).state;
-  assert.strictEqual(state.index, 0);
+  state = press(state, { name: 's', sequence: 's' }).state;
+
+  assert.strictEqual(state.query, 's', 'a letra foi para a busca');
+  assert.strictEqual(state.index, 0, 'o indice nao se moveu');
 });
 
 test('navegacao circula nas pontas', () => {
   let state = createState(items(3), { viewport: 3 });
-  state = press(state, { name: 'w' }).state;
+  state = press(state, { name: 'up' }).state;
   assert.strictEqual(state.index, 2, 'subir no topo vai pro fim');
-  state = press(state, { name: 's' }).state;
+  state = press(state, { name: 'down' }).state;
   assert.strictEqual(state.index, 0, 'descer no fim volta pro topo');
 });
 
 test('viewport acompanha o indice', () => {
   let state = createState(items(20), { viewport: 5 });
-  for (let i = 0; i < 7; i++) state = press(state, { name: 's' }).state;
+  for (let i = 0; i < 7; i++) state = press(state, { name: 'down' }).state;
+
   assert.strictEqual(state.index, 7);
   assert.ok(state.offset <= state.index, 'indice nao fica acima da janela');
   assert.ok(state.index < state.offset + state.viewport, 'indice nao fica abaixo da janela');
@@ -87,18 +89,22 @@ test('Enter seleciona', () => {
   assert.strictEqual(press(state, { sequence: '\r' }).action, 'select');
 });
 
-test('Esc, q e ctrl+c cancelam', () => {
+test('Esc sai quando a busca esta vazia', () => {
   const state = createState(items(3), { viewport: 3 });
   assert.strictEqual(press(state, { name: 'escape' }).action, 'cancel');
-  assert.strictEqual(press(state, { name: 'q' }).action, 'cancel');
+});
+
+test('ctrl+c sempre cancela', () => {
+  const state = createState(items(3), { viewport: 3 });
   assert.strictEqual(press(state, { name: 'c', ctrl: true }).action, 'cancel');
 });
 
-test('tecla desconhecida nao faz nada', () => {
+test('tecla sem efeito nao altera o estado', () => {
   const state = createState(items(3), { viewport: 3 });
-  const result = press(state, { name: 'z' });
+  const result = press(state, { name: 'f5' });
   assert.strictEqual(result.action, 'none');
   assert.strictEqual(result.state.index, 0);
+  assert.strictEqual(result.state.query, '');
 });
 
 test('keypress sem objeto de tecla nao quebra', () => {
@@ -109,30 +115,43 @@ test('keypress sem objeto de tecla nao quebra', () => {
 
 test('lista de um item unico nao quebra com navegacao', () => {
   let state = createState(items(1), { viewport: 5 });
-  state = press(state, { name: 's' }).state;
-  state = press(state, { name: 'w' }).state;
+  state = press(state, { name: 'down' }).state;
+  state = press(state, { name: 'up' }).state;
   state = press(state, { name: 'pagedown' }).state;
   assert.strictEqual(state.index, 0);
 });
 
 test('lista vazia nao quebra', () => {
   const state = createState([], { viewport: 5 });
-  const result = press(state, { name: 's' });
+  const result = press(state, { name: 'down' });
   assert.strictEqual(result.state.index, 0);
   assert.doesNotThrow(() => render(state));
 });
 
 test('render marca a linha selecionada e respeita a largura', () => {
   let state = createState(items(10), { viewport: 3, columns: 80, color: false });
-  state = press(state, { name: 's' }).state;
+  state = press(state, { name: 'down' }).state;
 
-  const out = render(state);
-  const lines = out.split('\n');
+  const lines = render(state).split('\n');
   lines.forEach((line) => assert.ok(line.length <= 80, `linha excede 80 colunas: ${line}`));
 
   const marked = lines.filter((l) => l.startsWith('> '));
   assert.strictEqual(marked.length, 1);
   assert.ok(marked[0].includes('resumo da sessao 1'));
+});
+
+test('caixa de busca aparece mesmo sem termo digitado', () => {
+  const out = render(createState(items(3), { viewport: 3, columns: 80, color: false }));
+  assert.ok(out.includes('Search'), 'mostra o placeholder');
+  assert.ok(out.includes('\u250c'), 'desenha a caixa');
+});
+
+test('cabecalho mostra posicao e total', () => {
+  let state = createState(items(9), { viewport: 4, columns: 80, color: false });
+  assert.ok(render(state).includes('Sessoes (1 de 9)'));
+
+  state = press(state, { name: 'down' }).state;
+  assert.ok(render(state).includes('Sessoes (2 de 9)'));
 });
 
 test('cada sessao ocupa duas linhas: rotulo em cima, metadados embaixo', () => {
@@ -159,7 +178,7 @@ test('cada sessao ocupa duas linhas: rotulo em cima, metadados embaixo', () => {
   const meta = lines.find((l) => l.includes('claude'));
 
   assert.ok(head.startsWith('> '), 'a primeira linha traz o marcador e o rotulo');
-  assert.deepStrictEqual(meta.trim().split(' · '), [
+  assert.deepStrictEqual(meta.trim().split(' \u00b7 '), [
     'claude',
     '2d atras',
     'master',
@@ -173,7 +192,7 @@ test('metadados ausentes somem em vez de virar campo vazio', () => {
   const out = render(createState(magro, { viewport: 1, columns: 80, color: false }));
   const meta = out.split('\n').find((l) => l.includes('codex'));
 
-  assert.strictEqual(meta.trim(), 'codex · agora');
+  assert.strictEqual(meta.trim(), 'codex \u00b7 agora');
 });
 
 test('tokens de contexto e acumulados nao se confundem', () => {
@@ -200,14 +219,14 @@ test('titulo tem prioridade sobre resumo na linha', () => {
 
 test('render mostra indicadores de rolagem', () => {
   let state = createState(items(30), { viewport: 4, columns: 80, color: false });
-  const top = render(state);
-  assert.ok(!top.includes('mais 0 acima'));
-  assert.ok(top.includes('abaixo'));
+  const topo = render(state);
+  assert.ok(!topo.includes('acima'));
+  assert.ok(topo.includes('abaixo'));
 
-  for (let i = 0; i < 10; i++) state = press(state, { name: 's' }).state;
-  const mid = render(state);
-  assert.ok(mid.includes('acima'));
-  assert.ok(mid.includes('abaixo'));
+  for (let i = 0; i < 10; i++) state = press(state, { name: 'down' }).state;
+  const meio = render(state);
+  assert.ok(meio.includes('acima'));
+  assert.ok(meio.includes('abaixo'));
 });
 
 test('cores saem quando color=false', () => {

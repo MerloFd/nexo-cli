@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 
 const CACHE_FILE = path.join(os.homedir(), '.nexo-cache.json');
-const VERSION = 1;
+const VERSION = 2;
 
 // Sessao encerrada nunca mais muda, e a maioria das sessoes esta encerrada.
 // Chavear por mtime+tamanho deixa o start pagar so pelo que mexeu desde a
