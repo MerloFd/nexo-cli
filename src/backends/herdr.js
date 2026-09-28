@@ -1,4 +1,4 @@
-const { execFileSync } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
 
 function available() {
   if (process.env.HERDR_ENV !== '1') return false;
@@ -31,12 +31,17 @@ function open(session, command, { background = false } = {}) {
   const [kind, ...resumeArgs] = command;
   const agentName = `sw${Date.now().toString().slice(-6)}`;
 
-  execFileSync('herdr', [
-    'agent', 'start', agentName,
-    '--kind', kind,
-    '--pane', paneId,
-    '--', ...resumeArgs,
-  ], { stdio: 'ignore' });
+  // "herdr agent start" so retorna depois que o agente esta pronto para
+  // interagir - para o Claude isso mede segundos, nao milissegundos. Esperar
+  // isso de forma sincrona travava o nexo inteiro ate a sessao carregar.
+  // Como o pane ja existe e ja e valido (acabou de ser criado), o start pode
+  // rodar em segundo plano: a aba abre e carrega sozinha, sem prender o nexo.
+  const child = spawn(
+    'herdr',
+    ['agent', 'start', agentName, '--kind', kind, '--pane', paneId, '--', ...resumeArgs],
+    { detached: true, stdio: 'ignore' }
+  );
+  child.unref();
 }
 
 module.exports = { name: 'herdr', available, open };
