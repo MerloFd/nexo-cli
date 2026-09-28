@@ -302,16 +302,31 @@ function renderColoredMeta(state, item) {
   return `    ${segmentos.map((s) => paint(state, s.cor, s.texto)).join(separador)}`;
 }
 
+// "titulo | path" na mesma linha - o path nao aparecia em lugar nenhum da
+// lista antes disso, so no painel de preview ou no --json. Trunca a partir
+// da direita, entao quando nao cabe e o path que corta primeiro, nunca o
+// titulo - e o titulo que ajuda a reconhecer a sessao de relance.
 function renderItem(state, item, selected) {
   const marker = selected ? '> ' : state.marked.has(item.sessionId) ? '✓ ' : '  ';
   const label = item.title || item.summary;
-  const head = truncate(`${marker}${label}`, state.columns);
+  const headPlano = `${marker}${label}  |  ${item.dir}`;
+  const cabeHead = headPlano.length <= state.columns;
+
+  let head;
+  if (selected) {
+    head = paint(state, ANSI.bold + ANSI.cyan, cabeHead ? headPlano : truncate(headPlano, state.columns));
+  } else if (cabeHead) {
+    const separador = paint(state, ANSI.dim, '|');
+    head = `${marker}${label}  ${separador}  ${paint(state, ANSI.dim, item.dir)}`;
+  } else {
+    head = truncate(headPlano, state.columns);
+  }
 
   const metaPlano = `    ${metaLine(item)}`;
-  const cabe = metaPlano.length <= state.columns;
-  const meta = cabe ? renderColoredMeta(state, item) : paint(state, ANSI.dim, truncate(metaPlano, state.columns));
+  const cabeMeta = metaPlano.length <= state.columns;
+  const meta = cabeMeta ? renderColoredMeta(state, item) : paint(state, ANSI.dim, truncate(metaPlano, state.columns));
 
-  return [selected ? paint(state, ANSI.bold + ANSI.cyan, head) : head, meta];
+  return [head, meta];
 }
 
 function paint(state, code, text) {

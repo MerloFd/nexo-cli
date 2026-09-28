@@ -42,9 +42,9 @@ nexo --help         help
   │ ⌕ Search…                                          │
   └────────────────────────────────────────────────────┘
 
-> Session switcher tool
+> Session switcher tool  |  C:\DEV\nexo-cli
     claude · now · HEAD · 3.5MB · 323k ctx
-  FIX RECURRENCES
+  FIX RECURRENCES  |  C:\DEV\SistemasAtuais\SO5
     codex · 2d ago · frete-refactor · 18.6MB · 3.7M used
 ```
 

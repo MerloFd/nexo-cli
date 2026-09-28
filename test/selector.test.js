@@ -572,3 +572,38 @@ test('titulo comprido colorido nao vaza cor pro lado do preview', () => {
   // outro codigo de cor ainda aberto antes do divisor.
   assert.ok(linhaMeta.includes('\x1b[0m'), 'a linha cortada fecha a cor com reset');
 });
+
+test('mostra "titulo | path" na primeira linha', () => {
+  const state = createState(items(1), { viewport: 1, columns: 90, color: false });
+  const out = render(state);
+
+  assert.ok(out.includes('resumo da sessao 0'));
+  assert.ok(out.includes('|'));
+  assert.ok(out.includes('C:\\DEV\\proj0'));
+});
+
+test('quando nao cabe, o path corta antes do titulo, nunca o contrario', () => {
+  const item = {
+    dir: 'C:\\DEV\\um\\caminho\\bem\\comprido\\que\\nao\\cabe\\de\\jeito\\nenhum\\na\\tela',
+    sessionId: 'id1',
+    agent: 'claude',
+    age: 'agora',
+    title: 'Titulo curto',
+    summary: 's',
+  };
+
+  const out = render(createState([item], { viewport: 1, columns: 40, color: false }));
+  const head = out.split('\n').find((l) => l.includes('Titulo curto'));
+
+  assert.ok(head.includes('Titulo curto'), 'titulo inteiro sobrevive ao corte');
+  assert.ok(head.length <= 40, `linha excede a largura: ${head.length}`);
+});
+
+test('path aparece dim quando o item nao esta selecionado', () => {
+  const dados = items(2);
+  const state = createState(dados, { viewport: 2, columns: 90, color: true });
+  const linhas = render(state).split('\n');
+
+  const naoSelecionada = linhas.find((l) => l.includes('proj1'));
+  assert.ok(naoSelecionada.includes('\x1b[2m'), 'path do item nao selecionado usa dim');
+});
