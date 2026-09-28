@@ -82,7 +82,6 @@ function scanSqlite(home) {
       tokensKind: row.tokens_used ? 'cumulative' : null,
       bytes: fileSize(row.rollout_path),
       filePath: row.rollout_path || null,
-      filePath: row.rollout_path || null,
     }));
   } catch {
     return null;

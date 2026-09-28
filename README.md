@@ -10,7 +10,8 @@ picture — and after a weekend nobody remembers where they stopped.
 searchable list, and opens the one you pick **in a new terminal**, without
 taking down what you already have open.
 
-Supports **Claude Code** and **OpenAI Codex** today.
+Supports **Claude Code** and **OpenAI Codex** today, with **opencode** as a
+best-effort adapter (see the note below the table).
 
 ## Install
 
@@ -148,6 +149,12 @@ are not billed per unit, so any amount would be made up.
 | --- | --- | --- |
 | Claude Code | `~/.claude/projects/*/*.jsonl` | `claude -r <id>` |
 | Codex | `~/.codex/state*.sqlite`, falling back to the JSONL rollouts | `codex resume <id>` |
+| opencode | `~/.local/share/opencode/opencode.db` (`OPENCODE_DB` overrides it) | `opencode --session <id>` |
+
+The opencode adapter is built from its public schema, unit-tested against a
+synthetic database, but not verified against a real opencode installation —
+none was available while writing it. If you use opencode and hit a problem,
+please open an issue.
 
 The project directory comes from the `cwd` field inside the file, never from the
 folder name: `C--DEV-SO5-SO5-Back-End` is too ambiguous to decode back.
