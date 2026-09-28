@@ -37,6 +37,7 @@ function pickInteractive(sessions) {
     viewport: viewportFor(out.rows),
     columns: out.columns || 80,
     color: !process.env.NO_COLOR,
+    cwd: process.cwd(),
   });
 
   return new Promise((resolve) => {

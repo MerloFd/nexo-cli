@@ -1,4 +1,5 @@
 const { emptyTotals, addTotals, totalOf } = require('./collect');
+const { t } = require('../i18n');
 
 const BLOCOS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 
@@ -77,33 +78,41 @@ function tabela(linhas, { titulo, ordenarPorChave = false, limite = 0 } = {}) {
   }
 
   if (limite > 0 && ordenadas.length > limite) {
-    out.push(`  ... e mais ${ordenadas.length - limite}`);
+    out.push(t('usage.more', { n: ordenadas.length - limite }));
   }
 
   out.push('');
   return out;
 }
 
+// Os rotulos mudam de tamanho entre idiomas, entao a coluna se alinha em
+// tempo de execucao em vez de depender de espacos fixos no texto.
+const LARGURA_ROTULO = 14;
+
+function rotulo(nome, valor, pct) {
+  return `  ${nome.padEnd(LARGURA_ROTULO)} ${human(valor).padStart(6)}  ${pct(valor)}`;
+}
+
 function resumo(samples) {
   const totals = samples.reduce((acc, s) => addTotals(acc, s.totals), emptyTotals());
   const total = totalOf(totals);
-  if (total === 0) return ['Nenhum uso de token encontrado.'];
+  if (total === 0) return [t('usage.empty')];
 
   const pct = (n) => `${Math.round((n / total) * 100)}%`.padStart(4);
 
   return [
-    `Total: ${human(total)} tokens em ${samples.length} turnos`,
+    t('usage.total', { tokens: human(total), turns: samples.length }),
     '',
-    `  entrada        ${human(totals.input).padStart(6)}  ${pct(totals.input)}`,
-    `  saida          ${human(totals.output).padStart(6)}  ${pct(totals.output)}`,
-    `  leitura cache  ${human(totals.cacheRead).padStart(6)}  ${pct(totals.cacheRead)}`,
-    `  escrita cache  ${human(totals.cacheWrite).padStart(6)}  ${pct(totals.cacheWrite)}`,
+    rotulo(t('usage.input'), totals.input, pct),
+    rotulo(t('usage.output'), totals.output, pct),
+    rotulo(t('usage.cacheRead'), totals.cacheRead, pct),
+    rotulo(t('usage.cacheWrite'), totals.cacheWrite, pct),
     '',
   ];
 }
 
 function build(samples, { periodo = 'dia', topProjetos = 10 } = {}) {
-  if (samples.length === 0) return 'Nenhum uso de token encontrado.';
+  if (samples.length === 0) return t('usage.empty');
 
   const porTempo =
     periodo === 'semana'
@@ -112,23 +121,23 @@ function build(samples, { periodo = 'dia', topProjetos = 10 } = {}) {
 
   const linhas = [
     ...resumo(samples),
-    ...tabela(porTempo, { titulo: periodo === 'semana' ? 'Por semana' : 'Por dia', ordenarPorChave: true }),
-    ...tabela(agrupar(samples, (s) => s.agent), { titulo: 'Por agente' }),
-    ...tabela(agrupar(samples, (s) => s.model), { titulo: 'Por modelo' }),
-    ...tabela(agrupar(samples, (s) => s.dir), { titulo: 'Por projeto', limite: topProjetos }),
+    ...tabela(porTempo, { titulo: t(periodo === 'semana' ? 'usage.byWeek' : 'usage.byDay'), ordenarPorChave: true }),
+    ...tabela(agrupar(samples, (s) => s.agent), { titulo: t('usage.byAgent') }),
+    ...tabela(agrupar(samples, (s) => s.model), { titulo: t('usage.byModel') }),
+    ...tabela(agrupar(samples, (s) => s.dir), { titulo: t('usage.byProject'), limite: topProjetos }),
   ];
 
   const aproximados = samples.filter((s) => s.approximate).length;
   if (aproximados > 0) {
     linhas.push(
-      `Nota: ${aproximados} sessao(oes) do Codex sem detalhe por turno entraram`,
-      'apenas com o total da sessao, sem quebra por dia.',
+      t('usage.approximate.1', { n: aproximados }),
+      t('usage.approximate.2'),
       ''
     );
   }
 
-  linhas.push('Sem valores em dinheiro: em plano de assinatura o token nao e cobrado');
-  linhas.push('por unidade, entao qualquer cifra aqui seria inventada.');
+  linhas.push(t('usage.noMoney.1'));
+  linhas.push(t('usage.noMoney.2'));
 
   return linhas.join('\n');
 }

@@ -1,18 +1,18 @@
 # nexo
 
-Sessoes de agentes de IA de terminal, todas em um lugar so.
+Sessions from terminal AI agents, all in one place.
 
-O `/resume` do Claude Code e o `codex resume` so enxergam o agente deles. Se
-voce usa mais de um agente, em varios repositorios, nao existe um lugar que
-mostre tudo junto - e depois de um fim de semana ninguem lembra onde parou.
+Claude Code's `/resume` and `codex resume` each only see their own agent. If you
+run more than one agent across several repositories, nothing shows you the whole
+picture — and after a weekend nobody remembers where they stopped.
 
-O `nexo` le os arquivos locais de sessao de cada agente, lista tudo numa lista
-so com busca, e abre a escolhida **em um terminal novo**, sem derrubar o que
-voce ja tem aberto.
+`nexo` reads the local session files of each agent, puts everything in one
+searchable list, and opens the one you pick **in a new terminal**, without
+taking down what you already have open.
 
-Suporta hoje **Claude Code** e **OpenAI Codex**.
+Supports **Claude Code** and **OpenAI Codex** today.
 
-## Instalar
+## Install
 
 ```
 git clone https://github.com/MerloFd/nexo-cli
@@ -20,135 +20,145 @@ cd nexo-cli
 npm install -g .
 ```
 
-Precisa de Node 18+. Nenhuma dependencia externa.
+Node 18+. No external dependencies.
 
-## Uso
-
-```
-nexo                lista as sessoes e abre a escolhida
-nexo <termo>        ja abre a lista filtrada
-nexo scan           procura credencial vazada nos logs
-nexo usage          panorama de uso de tokens
-nexo --help         ajuda
-```
-
-### A lista
+## Usage
 
 ```
-  Sessoes (1 de 71)
+nexo                list the sessions and open the one you pick
+nexo <term>         open the list already filtered
+nexo scan           look for credentials leaked into the session logs
+nexo usage          token usage overview
+nexo lang [en|pt]   show or change the interface language
+nexo --help         help
+```
+
+### The list
+
+```
+  Sessions global (1 of 71)
   ┌────────────────────────────────────────────────────┐
   │ ⌕ Search…                                          │
   └────────────────────────────────────────────────────┘
 
-> Ferramenta de switch entre sessoes
-    claude · agora · HEAD · 3.5MB · 323k ctx
-  FIX RECORRENCIAS
-    codex · 2d atras · frete-refactor · 18.6MB · 3.7M usados
+> Session switcher tool
+    claude · now · HEAD · 3.5MB · 323k ctx
+  FIX RECURRENCES
+    codex · 2d ago · frete-refactor · 18.6MB · 3.7M used
 ```
 
-Digite qualquer coisa e a busca comeca - sem prefixo. Ela ignora acento e
-caixa, trata varios termos como E, e procura em agente, branch, titulo,
-diretorio e resumo. Setas (ou Ctrl+P / Ctrl+N) movem, Enter abre, Esc limpa a
-busca e, com ela ja vazia, sai.
+Type anything and the search starts — no prefix. It ignores accents and case,
+treats several terms as AND, and looks at agent, branch, title, directory and
+summary. Arrows (or Ctrl+P / Ctrl+N) move, Enter opens, Esc clears the search
+and, once empty, quits.
 
-O rotulo e o nome real da sessao: o que voce deu no `/rename`, ou o gerado pelo
-agente, ou a primeira mensagem sua, nessa ordem.
+**Ctrl+A** switches scope: every folder on the machine, or only the one you ran
+the command from. The header says which is active.
 
-### Onde a sessao abre
+The label is the session's real name: the one you set with `/rename`, or the one
+the agent generated, or your first message — in that order.
 
-Na ordem do mais capaz para o menos:
+### Language
 
-| Ambiente | Resultado |
+English by default. `nexo lang pt` switches to Portuguese, `nexo lang` shows the
+current one. The choice is saved in `~/.nexo-config.json`; `NEXO_LANG=pt`
+overrides it for a single run without touching the file.
+
+### Where the session opens
+
+From the most capable option to the least:
+
+| Environment | Result |
 | --- | --- |
-| Herdr | tab nova |
-| Windows Terminal | aba nova |
-| tmux | janela nova |
-| cmd / PowerShell classico | janela nova |
-| qualquer outro | imprime o comando pronto |
+| Herdr | new tab |
+| Windows Terminal | new tab |
+| tmux | new window |
+| classic cmd / PowerShell | new window |
+| anything else | prints the ready command |
 
-Nenhum deles e obrigatorio, e se um falhar o proximo assume.
+None of them is required, and if one fails the next takes over.
 
-No terminal integrado do VS Code a sessao sai em um terminal externo: o VS Code
-nao expoe API para criar aba por linha de comando
+Inside the VS Code integrated terminal the session opens in an external
+terminal: VS Code exposes no API to create a tab from the command line
 ([vscode#238786](https://github.com/microsoft/vscode/issues/238786)).
 
 ## nexo scan
 
-Varre os logs de sessao procurando credencial que passou pelo chat. Os achados
-vem separados por confianca, e o valor sempre aparece mascarado.
+Scans the session logs for credentials that went through the chat. Findings come
+grouped by confidence, and the value is always masked.
 
 ```
-26 achado(s) de alta confianca e 66 a conferir, em 21 sessao(oes).
+34 high-confidence finding(s) and 66 to review, across 22 session(s).
 
-ALTA CONFIANCA - formato so existe em credencial de verdade:
+HIGH CONFIDENCE - this shape only exists in real credentials:
 
-  Templates para EN
-    claude · 4d atras · C:\DEV\Projeto
-      AWS access key: AKI********GZ (56x)  linha 1292
+  Templates for EN
+    claude · 4d ago · C:\DEV\Project
+      AWS access key: AKI********GZ (56x)  line 1292
 ```
 
-Duas coisas que o relatorio deixa explicitas:
+Two things the report makes explicit:
 
-1. **Rotacione a credencial.** Ela ja foi enviada ao provedor junto com a
-   conversa; apagar o arquivo local nao desfaz isso.
-2. Depois limpe o log, que fica em texto puro no seu perfil e pode ser lido por
-   qualquer processo rodando com o seu usuario.
+1. **Rotate the credential.** It was already sent to the provider along with the
+   conversation; deleting the local file undoes nothing.
+2. Then clean the log, which sits in plain text in your profile and can be read
+   by any process running as you.
 
-`nexo scan --json` devolve apenas metadado - tipo, contagem e localizacao.
-Nunca o valor do segredo.
+`nexo scan --json` returns metadata only — type, count and location. Never the
+secret itself.
 
 ## nexo usage
 
-Panorama de tokens por dia (ou `--semana`), agente, modelo e projeto.
+Token overview by day (or `--week`), agent, model and project.
 
 ```
-Total: 8.1B tokens em 22765 turnos
+Total: 8.2B tokens across 22827 turns
 
-  entrada          2.6M    0%
-  saida           19.4M    0%
-  leitura cache    7.9B   97%
-  escrita cache  201.0M    2%
+  input            2.6M    0%
+  output          19.4M    0%
+  cache read       7.9B   97%
+  cache write    201.0M    2%
 
-Por modelo
+By model
 
   claude-sonnet-5    7.2B  ████████████████████████
   claude-opus-5    547.9M  █▉
   gpt-5.5           23.5M  ▏
 ```
 
-Cada turno e contado com o modelo daquele turno, porque o modelo muda no meio
-da sessao. Nao ha valores em dinheiro: em plano de assinatura o token nao e
-cobrado por unidade, entao qualquer cifra seria inventada.
+Each turn is counted against the model used on that turn, because the model
+changes mid-session. There are no money figures: on a subscription plan tokens
+are not billed per unit, so any amount would be made up.
 
-## Como funciona
+## How it works
 
-| Agente | Origem | Retomada |
+| Agent | Source | Resume |
 | --- | --- | --- |
 | Claude Code | `~/.claude/projects/*/*.jsonl` | `claude -r <id>` |
-| Codex | `~/.codex/state*.sqlite`, com fallback nos rollouts JSONL | `codex resume <id>` |
+| Codex | `~/.codex/state*.sqlite`, falling back to the JSONL rollouts | `codex resume <id>` |
 
-O diretorio do projeto vem do campo `cwd` de dentro do arquivo, nunca do nome
-da pasta: `C--DEV-SO5-SO5-Back-End` e ambiguo demais para decodificar.
+The project directory comes from the `cwd` field inside the file, never from the
+folder name: `C--DEV-SO5-SO5-Back-End` is too ambiguous to decode back.
 
-Titulo, branch e uso sao reescritos ao longo do arquivo, entao valem os
-ultimos - por isso so os 64KB finais sao lidos, em vez do arquivo inteiro. Um
-cache chaveado por mtime e tamanho evita reler o que nao mudou: a listagem sai
-em cerca de 100ms. `NEXO_NO_CACHE=1` desliga.
+Title, branch and usage are rewritten throughout the file, so the last ones win
+— which is why only the final 64KB are read instead of the whole file. A cache
+keyed by mtime and size avoids re-reading what did not change, so the list comes
+up in about 100ms. `NEXO_NO_CACHE=1` turns it off.
 
-## Projetos parecidos
+## Similar projects
 
-- [fast-resume](https://github.com/angristan/fast-resume) - mesma ideia, em
-  Rust, com mais agentes. Nao publica binario para Windows e usa `exec()`,
-  substituindo a sessao atual em vez de abrir outra.
-- [ccusage](https://ccusage.com) - contagem de tokens e custo para ~18 agentes.
-  Mais completo que o `nexo usage`, mas nao lista nem retoma sessao.
+- [fast-resume](https://github.com/angristan/fast-resume) — same idea, in Rust,
+  with more agents. Ships no Windows binary and uses `exec()`, replacing your
+  current session instead of opening another one.
+- [ccusage](https://ccusage.com) — token and cost accounting for ~18 agents.
+  More thorough than `nexo usage`, but it neither lists nor resumes sessions.
 
-## Testes
+## Tests
 
 ```
 npm test
 ```
 
-## Licenca
+## License
 
 MIT

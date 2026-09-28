@@ -1,5 +1,6 @@
 const { scanSessions } = require('../scan');
 const { daysAgo } = require('../scanSessions');
+const { t } = require('../i18n');
 
 function contar(results, confidence) {
   return results.reduce(
@@ -36,34 +37,34 @@ function imprimirGrupo(results, confidence, titulo, nota) {
 
 function printReport(results) {
   if (results.length === 0) {
-    console.log('Nenhum segredo encontrado nos logs de sessao.');
+    console.log(t('scan.clean'));
     return;
   }
 
   const altas = contar(results, 'alta');
   const resto = contar(results, 'media') + contar(results, 'baixa');
-  console.log(`${altas} achado(s) de alta confianca e ${resto} a conferir, em ${results.length} sessao(oes).\n`);
+  console.log(t('scan.summary', { high: altas, rest: resto, sessions: results.length }));
 
-  imprimirGrupo(results, 'alta', 'ALTA CONFIANCA - formato so existe em credencial de verdade:');
+  imprimirGrupo(results, 'alta', t('scan.group.high'));
   imprimirGrupo(
     results,
     'media',
-    'A CONFERIR - atribuicao com cara de segredo:',
-    '  Pode ser codigo citado ou exemplo. Olhe antes de agir.'
+    t('scan.group.medium'),
+    t('scan.group.medium.note')
   );
   imprimirGrupo(
     results,
     'baixa',
-    'RUIDO PROVAVEL - string aleatoria perto de palavra sensivel:',
-    '  Costuma ser hash, id ou caminho. Listado para nao esconder nada.'
+    t('scan.group.low'),
+    t('scan.group.low.note')
   );
 
   if (altas > 0) {
-    console.log('O que fazer, nesta ordem:');
-    console.log('  1. ROTACIONE as credenciais de alta confianca. Elas ja foram enviadas ao');
-    console.log('     provedor junto com a conversa - apagar o arquivo local nao desfaz isso.');
-    console.log('  2. Depois limpe o log local, que fica em texto puro no seu perfil e pode');
-    console.log('     ser lido por qualquer processo rodando com o seu usuario.');
+    console.log(t('scan.advice.title'));
+    console.log(t('scan.advice.1'));
+    console.log(t('scan.advice.2'));
+    console.log(t('scan.advice.3'));
+    console.log(t('scan.advice.4'));
   }
 }
 
@@ -93,7 +94,7 @@ async function run(sessions, { json = false } = {}) {
   const comArquivo = sessions.filter((s) => s.filePath);
 
   if (!json) {
-    console.log(`Varrendo ${comArquivo.length} sessao(oes)...`);
+    console.log(t('scan.scanning', { n: comArquivo.length }));
   }
 
   const results = await scanSessions(comArquivo);

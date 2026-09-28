@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
+// Fixa o idioma: sem isso a suite quebraria conforme a preferencia da maquina.
+process.env.NEXO_LANG = 'en';
+
 const { createState, applyKey, render, filterItems, normalize } = require('../src/selector');
 
 const SAMPLE = [
@@ -139,12 +142,12 @@ test('render mostra o termo digitado e a contagem no cabecalho', () => {
   const out = render(state);
 
   assert.ok(out.includes('so5'), 'mostra o termo na caixa');
-  assert.ok(out.includes('(1 de 1)'), 'o cabecalho reflete o resultado');
+  assert.ok(out.includes('(1 of 1)'), 'o cabecalho reflete o resultado');
 });
 
 test('render avisa quando nada casa', () => {
   const state = type(createState(SAMPLE, { viewport: 5, columns: 70, color: false }), 'zzzzzz');
-  assert.ok(render(state).includes('nenhuma sessao corresponde'));
+  assert.ok(render(state).includes('no session matches'));
 });
 
 test('render respeita largura tambem com busca ativa', () => {
@@ -157,8 +160,8 @@ test('render respeita largura tambem com busca ativa', () => {
 
 test('a dica de rodape muda quando ha busca', () => {
   const vazio = createState(SAMPLE, { viewport: 5, columns: 90, color: false });
-  assert.ok(render(vazio).includes('digite para buscar'));
+  assert.ok(render(vazio).includes('type to search'));
 
   const buscando = type(vazio, 'so');
-  assert.ok(render(buscando).includes('Esc limpa a busca'));
+  assert.ok(render(buscando).includes('clears search'));
 });

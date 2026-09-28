@@ -41,6 +41,7 @@ function run(args, { home = makeHome(), expectFail = false } = {}) {
     HERDR_WORKSPACE_ID: '',
     TMUX: '',
     NEXO_FORCE_FALLBACK: '1',
+    NEXO_LANG: 'en',
   };
 
   try {
@@ -54,7 +55,7 @@ function run(args, { home = makeHome(), expectFail = false } = {}) {
 }
 
 test('--help nao depende de sessoes', () => {
-  assert.match(run(['--help']), /nexo <termo>/);
+  assert.match(run(['--help']), /nexo <term>/);
 });
 
 test('--json devolve JSON valido', () => {
@@ -77,31 +78,31 @@ test('--list imprime as duas sessoes', () => {
 
 test('termo sem resultado falha com exit != 0', () => {
   const out = run(['--json', 'zzzzzz'], { expectFail: true });
-  assert.match(out, /Nenhuma sessao corresponde/);
+  assert.match(out, /No session matches/);
 });
 
 test('--open aceita id completo', () => {
   const out = run(['--open', 'bbb22222-2222-2222-2222-222222222222']);
-  assert.match(out, /Abrindo C:\\DEV\\Beta/);
+  assert.match(out, /Opening C:\\DEV\\Beta/);
 });
 
 test('--open aceita prefixo do id', () => {
   const out = run(['--open', 'aaa11111']);
-  assert.match(out, /Abrindo C:\\DEV\\Alpha/);
+  assert.match(out, /Opening C:\\DEV\\Alpha/);
 });
 
 test('--open com id inexistente falha', () => {
   const out = run(['--open', 'naoexiste'], { expectFail: true });
-  assert.match(out, /Sessao nao encontrada/);
+  assert.match(out, /Session not found/);
 });
 
 test('--open sem valor falha', () => {
   const out = run(['--open'], { expectFail: true });
-  assert.match(out, /Sessao nao encontrada/);
+  assert.match(out, /Session not found/);
 });
 
 test('sem sessoes nenhuma falha com mensagem clara', () => {
   const vazio = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-vazio-'));
   const out = run(['--list'], { home: vazio, expectFail: true });
-  assert.match(out, /Nenhuma sessao do Claude Code encontrada/);
+  assert.match(out, /No agent session found/);
 });
