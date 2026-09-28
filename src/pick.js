@@ -24,8 +24,9 @@ function toRows(sessions) {
   }));
 }
 
+// cabecalho + caixa de busca (3) + indicadores de rolagem (2) + rodape
 function viewportFor(rows) {
-  return Math.max(1, Math.floor(((rows || 24) - 6) / 2));
+  return Math.max(1, Math.floor(((rows || 24) - 7) / 2));
 }
 
 function pickInteractive(sessions) {

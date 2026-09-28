@@ -39,7 +39,6 @@ function createState(items, { viewport = 10, columns = 80, color = true } = {}) 
     columns: Math.max(20, columns),
     color,
     query: '',
-    mode: 'nav',
   };
 }
 
@@ -110,6 +109,9 @@ function selectOrNothing(state) {
   return { state, action: 'select' };
 }
 
+// A busca esta sempre ativa: qualquer caractere imprimivel vai para o termo,
+// como no /resume do Claude Code. Por isso a navegacao fica nas setas - letra
+// nenhuma pode ser atalho, ou seria impossivel buscar por ela.
 function applyKey(state, key = {}) {
   const name = key.name || '';
   const seq = key.sequence || '';
@@ -122,38 +124,21 @@ function applyKey(state, key = {}) {
   const navigated = navigationFor(state, key);
   if (navigated) return navigated;
 
-  if (state.mode === 'filter') {
-    if (name === 'escape') {
-      return { state: { ...setQuery(state, ''), mode: 'nav' }, action: 'move' };
-    }
-    if (key.ctrl && name === 'u') {
-      return { state: setQuery(state, ''), action: 'move' };
-    }
-    if (name === 'backspace') {
-      if (state.query.length === 0) return { state: { ...state, mode: 'nav' }, action: 'move' };
-      return { state: setQuery(state, state.query.slice(0, -1)), action: 'move' };
-    }
-    if (isPrintable(key)) {
-      return { state: setQuery(state, state.query + seq), action: 'move' };
-    }
-    return { state, action: 'none' };
+  if (name === 'escape') {
+    if (state.query) return { state: setQuery(state, ''), action: 'move' };
+    return { state, action: 'cancel' };
   }
 
-  if (seq === '/') return { state: { ...state, mode: 'filter' }, action: 'move' };
+  if (key.ctrl && name === 'u') return { state: setQuery(state, ''), action: 'move' };
 
-  switch (name) {
-    case 'k':
-    case 'w':
-      return { state: move(state, -1, { wrap: true }), action: 'move' };
-    case 'j':
-    case 's':
-      return { state: move(state, 1, { wrap: true }), action: 'move' };
-    case 'escape':
-    case 'q':
-      return { state, action: 'cancel' };
-    default:
-      return { state, action: 'none' };
+  if (name === 'backspace') {
+    if (!state.query) return { state, action: 'none' };
+    return { state: setQuery(state, state.query.slice(0, -1)), action: 'move' };
   }
+
+  if (isPrintable(key)) return { state: setQuery(state, state.query + seq), action: 'move' };
+
+  return { state, action: 'none' };
 }
 
 function truncate(text, columns) {
@@ -208,46 +193,59 @@ function paint(state, code, text) {
   return `${code}${text}${ANSI.reset}`;
 }
 
-function hintFor(state) {
-  if (state.mode === 'filter') {
-    return 'digite para filtrar   setas mover   Enter abrir   Esc limpar';
-  }
-  return 'W/S ou setas mover   / filtrar   Enter abrir   Esc sair';
+function header(state) {
+  const posicao = state.items.length ? state.index + 1 : 0;
+  return paint(
+    state,
+    ANSI.bold,
+    truncate(`  Sessoes (${posicao} de ${state.items.length})`, state.columns)
+  );
 }
 
-function filterLine(state) {
-  if (state.mode !== 'filter' && !state.query) return '';
+// Caixa de busca sempre visivel, como no /resume: o usuario digita direto,
+// sem prefixo, e ve o termo enquanto a lista encolhe embaixo.
+function searchBox(state) {
+  const width = Math.max(24, Math.min(state.columns - 4, 100));
+  const inner = width - 2;
+  const conteudo = state.query ? `${state.query}█` : 'Search…';
+  const texto = ` ⌕ ${conteudo}`;
+  const preenchido = texto.length > inner ? truncate(texto, inner) : texto.padEnd(inner);
 
-  const cursor = state.mode === 'filter' ? '█' : '';
-  const label = `  / ${state.query}${cursor}`;
-  const count = `${state.items.length} de ${state.allItems.length}`;
-  const gap = Math.max(1, state.columns - label.length - count.length - 2);
+  const linha = state.query ? ANSI.cyan : ANSI.dim;
 
-  return paint(state, ANSI.yellow, truncate(`${label}${' '.repeat(gap)}${count}`, state.columns));
+  return [
+    paint(state, linha, `  ┌${'─'.repeat(inner)}┐`),
+    `  ${paint(state, linha, '│')}${state.query ? preenchido : paint(state, ANSI.dim, preenchido)}${paint(state, linha, '│')}`,
+    paint(state, linha, `  └${'─'.repeat(inner)}┘`),
+  ];
+}
+
+function footer(state) {
+  const dica = state.query
+    ? 'setas mover   Enter abrir   Esc limpa a busca'
+    : 'digite para buscar   setas mover   Enter abrir   Esc sair';
+  return paint(state, ANSI.dim, truncate(`  ${dica}`, state.columns));
 }
 
 function render(state) {
-  const { items, index, offset, viewport, columns, allItems } = state;
-  const lines = [];
-
-  lines.push(paint(state, ANSI.dim, truncate(`  ${allItems.length} sessao(oes)   ${hintFor(state)}`, columns)));
-  lines.push(filterLine(state));
-  lines.push('');
+  const { items, index, offset, viewport, columns } = state;
+  const lines = [header(state), ...searchBox(state)];
 
   if (items.length === 0) {
-    lines.push(paint(state, ANSI.dim, '  nenhuma sessao corresponde ao filtro'));
+    lines.push('', paint(state, ANSI.dim, '  nenhuma sessao corresponde a busca'), '', footer(state));
     return lines.join('\n');
   }
 
-  lines.push(offset > 0 ? paint(state, ANSI.dim, `  ^ mais ${offset} acima`) : '');
+  lines.push(offset > 0 ? paint(state, ANSI.dim, `  ↑ mais ${offset} acima`) : '');
 
   const end = Math.min(offset + viewport, items.length);
   for (let i = offset; i < end; i++) {
     lines.push(...renderItem(state, items[i], i === index));
   }
 
-  const below = items.length - end;
-  lines.push(below > 0 ? paint(state, ANSI.dim, `  v mais ${below} abaixo`) : '');
+  const abaixo = items.length - end;
+  lines.push(abaixo > 0 ? paint(state, ANSI.dim, `  ↓ mais ${abaixo} abaixo`) : '');
+  lines.push(footer(state));
 
   return lines.join('\n');
 }

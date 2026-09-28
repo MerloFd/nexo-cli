@@ -1,10 +1,13 @@
 const herdr = require('./herdr');
 const windowsTerminal = require('./windowsTerminal');
 const tmux = require('./tmux');
+const windowsConsole = require('./windowsConsole');
 const fallback = require('./fallback');
 const { resumeArgs } = require('../agents');
 
-const BACKENDS = [herdr, windowsTerminal, tmux, fallback];
+// Do mais capaz para o menos: quem abre aba vem antes de quem so abre janela,
+// e imprimir o comando e o ultimo recurso.
+const BACKENDS = [herdr, windowsTerminal, tmux, windowsConsole, fallback];
 
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{4,64}$/;
 
