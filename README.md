@@ -66,6 +66,27 @@ opens the highlighted session and closes the list.
 The label is the session's real name: the one you set with `/rename`, or the one
 the agent generated, or your first message — in that order.
 
+**Ctrl+←/→** cycles a filter tab — every agent that has a session, plus "all" —
+shown above the list once more than one agent is present. **Ctrl+T** toggles a
+side-by-side preview of the highlighted session's conversation, when the
+terminal is at least 116 columns wide:
+
+```
+> Fits (Melhorias)                                    │ claude · Fits (Melhorias)
+    claude · 1221 turns · 1h ago · HEAD · 4.8MB        │ C:\DEV\SistemasAtuais\SO5 · 1h ago
+  FIX GERENCIADOR CARDS COM SPEC                       │
+    claude · 542 turns · 1h ago · HEAD · 2.9MB         │ > eu tenho o spec-kit instalado...
+                                                        │   Achado. specify-cli tá instalado...
+```
+
+Preview is Claude-only for now — Codex and opencode show a plain "no preview"
+message instead of content. It shows the first ~4000 characters of the
+conversation, no syntax highlighting, no scrolling: a quick look at where the
+session started, not a full transcript reader.
+
+Session age also gets a color hint in the metadata line: green under an hour,
+cyan under a day, yellow under a week, and the usual dim beyond that.
+
 ### Language
 
 English by default. `nexo lang pt` switches to Portuguese, `nexo lang` shows the

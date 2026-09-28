@@ -57,6 +57,7 @@ function createState(items, { viewport = 10, columns = 80, color = true, cwd = n
     scope,
     marked: new Set(),
     agentFilter: null,
+    previewOn: false,
   };
 }
 
@@ -201,6 +202,7 @@ function applyKey(state, key = {}) {
   if (key.ctrl && name === 'a') return { state: toggleScope(state), action: 'move' };
   if (key.ctrl && name === 'right') return { state: cycleAgentFilter(state, 1), action: 'move' };
   if (key.ctrl && name === 'left') return { state: cycleAgentFilter(state, -1), action: 'move' };
+  if (key.ctrl && name === 't') return { state: { ...state, previewOn: !state.previewOn }, action: 'move' };
   if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n') {
     return selectOrNothing(state);
   }
@@ -384,26 +386,119 @@ function filterBar(state) {
   return `  ${colorido}`;
 }
 
-function render(state) {
+// Abaixo disso nao ha coluna sobrando pro painel - so lado a lado por
+// enquanto, sem o modo empilhado que o fast-resume usa em tela estreita (v1
+// deliberadamente mais simples: um layout so, ligado ou desligado).
+const PREVIEW_BREAKPOINT = 116;
+const PREVIEW_RATIO = 0.62;
+
+function previewActive(state) {
+  return state.previewOn && state.columns >= PREVIEW_BREAKPOINT;
+}
+
+// Codigo ANSI nao ocupa coluna visivel - contar o comprimento da string crua
+// preencheria de menos toda linha colorida, desalinhando o painel a direita.
+function visibleLength(str) {
+  return str.replace(/\x1b\[[0-9;]*m/g, '').length;
+}
+
+// Corta pelo comprimento VISIVEL, preservando os codigos ANSI que vierem
+// antes do corte, e fecha com reset - sem isso, cortar no meio de um trecho
+// colorido deixaria a cor vazar pro divisor e pro painel da direita.
+function truncateVisible(state, str, width) {
+  let visCount = 0;
+  let out = '';
+  let i = 0;
+
+  while (i < str.length && visCount < Math.max(0, width - 1)) {
+    if (str[i] === '\x1b') {
+      const resto = str.slice(i);
+      const m = /^\x1b\[[0-9;]*m/.exec(resto);
+      if (m) {
+        out += m[0];
+        i += m[0].length;
+        continue;
+      }
+    }
+    out += str[i];
+    visCount++;
+    i++;
+  }
+
+  return out + '…' + (state.color ? ANSI.reset : '');
+}
+
+// A lista renderiza pensando na largura TOTAL do terminal - com o painel
+// ativo, cada linha precisa caber so na fatia esquerda, nao na tela inteira.
+// Sem cortar aqui, um titulo comprido estoura a coluna e desalinha tudo que
+// vem depois dele (confirmado ao vivo: titulo longo do Codex quebrava a
+// linha e empurrava o divisor para fora de posicao).
+function padVisible(state, str, width) {
+  const vis = visibleLength(str);
+  if (vis > width) return truncateVisible(state, str, width);
+  return vis >= width ? str : str + ' '.repeat(width - vis);
+}
+
+function previewHeader(state, item) {
+  if (!item) return [];
+  return [
+    paint(state, ANSI.bold + ANSI.cyan, `${item.agent} · ${item.title || item.summary}`),
+    paint(state, ANSI.dim, `${item.dir} · ${item.age}`),
+    '',
+  ];
+}
+
+// previewLines: undefined = ainda carregando; null = agente sem previa
+// disponivel; array vazio = sessao sem mensagem nenhuma; array = conteudo.
+function previewBody(state, previewLines) {
+  if (previewLines === undefined) return [paint(state, ANSI.dim, t('preview.loading'))];
+  if (previewLines === null) return [paint(state, ANSI.dim, t('preview.unavailable'))];
+  if (previewLines.length === 0) return [paint(state, ANSI.dim, t('preview.empty'))];
+  return previewLines;
+}
+
+// A altura do bloco combinado segue SEMPRE a lista (leftLines), nunca o
+// preview - do contrario uma previa longa esticaria o quadro pra alem do
+// que o terminal comporta. Sem scroll no v1: o que nao coube so nao aparece.
+function composeSideBySide(state, leftLines, rightLines, leftWidth, rightWidth) {
+  const divisor = paint(state, ANSI.dim, '│');
+  return leftLines.map((esquerda, i) => {
+    const direitaBruta = rightLines[i] || '';
+    const direita =
+      direitaBruta.length > rightWidth ? `${direitaBruta.slice(0, Math.max(1, rightWidth - 1))}…` : direitaBruta;
+    return `${padVisible(state, esquerda, leftWidth)} ${divisor} ${direita}`;
+  });
+}
+
+function render(state, previewLines) {
   const { items, index, offset, viewport, columns } = state;
   const lines = ['', header(state), '', ...searchBox(state), filterBar(state), ''];
 
+  const corpo = [];
   if (items.length === 0) {
-    lines.push(paint(state, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')), '', footer(state));
-    return lines.join('\n');
+    corpo.push(paint(state, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')));
+  } else {
+    corpo.push(offset > 0 ? paint(state, ANSI.dim, '  ' + t('ui.scroll.up', { n: offset })) : '');
+
+    const end = Math.min(offset + viewport, items.length);
+    for (let i = offset; i < end; i++) corpo.push(...renderItem(state, items[i], i === index));
+
+    const abaixo = items.length - end;
+    corpo.push(abaixo > 0 ? paint(state, ANSI.dim, '  ' + t('ui.scroll.down', { n: abaixo })) : '');
   }
 
-  lines.push(offset > 0 ? paint(state, ANSI.dim, '  ' + t('ui.scroll.up', { n: offset })) : '');
+  if (previewActive(state) && items.length > 0) {
+    const largura = columns - 3; // 3 = " │ "
+    const leftWidth = Math.floor(largura * PREVIEW_RATIO);
+    const rightWidth = largura - leftWidth;
+    const painel = [...previewHeader(state, items[index]), ...previewBody(state, previewLines)];
 
-  const end = Math.min(offset + viewport, items.length);
-  for (let i = offset; i < end; i++) {
-    lines.push(...renderItem(state, items[i], i === index));
+    lines.push(...composeSideBySide(state, corpo, painel, leftWidth, rightWidth));
+  } else {
+    lines.push(...corpo);
   }
 
-  const abaixo = items.length - end;
-  lines.push(abaixo > 0 ? paint(state, ANSI.dim, '  ' + t('ui.scroll.down', { n: abaixo })) : '');
   lines.push('', footer(state));
-
   return lines.join('\n');
 }
 
@@ -424,4 +519,7 @@ module.exports = {
   filterItems,
   normalize,
   ANSI,
+  PREVIEW_BREAKPOINT,
+  previewActive,
+  visibleLength,
 };

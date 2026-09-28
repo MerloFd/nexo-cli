@@ -1,9 +1,10 @@
 const readline = require('readline');
 const { PassThrough } = require('stream');
 const { daysAgo } = require('./scanSessions');
-const { createState, applyKey, render, syncOffset, markAndAdvance } = require('./selector');
+const { createState, applyKey, render, syncOffset, markAndAdvance, previewActive } = require('./selector');
 const { extractCtrlEnter } = require('./ctrlEnter');
 const { openSession } = require('./backends');
+const { loadPreview } = require('./preview');
 
 const ALT_SCREEN_ON = '\x1b[?1049h';
 const ALT_SCREEN_OFF = '\x1b[?1049l';
@@ -25,6 +26,7 @@ function toRows(sessions) {
     tokensKind: s.tokensKind || null,
     title: s.title || null,
     summary: s.summary,
+    filePath: s.filePath || null,
     ref: s,
   }));
 }
@@ -67,12 +69,39 @@ function pickInteractive(sessions) {
     const decoded = new PassThrough();
     readline.emitKeypressEvents(decoded);
 
+    // Carregar a previa e I/O assincrono, mas o estado do seletor e sincrono
+    // e puro de proposito (selector.js nao sabe o que e um arquivo). A previa
+    // fica fora do estado, controlada aqui: recarrega so quando o item
+    // destacado muda, e descarta resposta atrasada se a selecao ja andou de
+    // novo antes dela chegar - sem isso, navegar rapido poderia mostrar a
+    // previa de uma sessao que nao e mais a destacada.
+    let previewLines;
+    let previewFor = null;
+    let previewToken = 0;
+
+    function ensurePreview() {
+      if (!previewActive(state)) return;
+      const atual = state.items[state.index];
+      if (!atual || previewFor === atual.sessionId) return;
+
+      previewFor = atual.sessionId;
+      previewLines = undefined;
+      const meuToken = ++previewToken;
+
+      loadPreview(atual.ref).then((linhas) => {
+        if (meuToken !== previewToken) return;
+        previewLines = linhas;
+        draw();
+      });
+    }
+
     let carry = '';
     function onRawData(chunk) {
       const found = extractCtrlEnter(chunk.toString('latin1'), carry);
       carry = found.carry;
       for (let i = 0; i < found.hits; i++) {
         state = markAndAdvance(state);
+        ensurePreview();
         draw();
       }
       if (found.remainder) decoded.write(Buffer.from(found.remainder, 'latin1'));
@@ -83,7 +112,7 @@ function pickInteractive(sessions) {
     process.stdin.resume();
     out.write(ALT_SCREEN_ON + CURSOR_HIDE);
 
-    const draw = () => out.write(CLEAR + render(state));
+    const draw = () => out.write(CLEAR + render(state, previewLines));
     draw();
 
     const onResize = () => {
@@ -92,6 +121,7 @@ function pickInteractive(sessions) {
         viewport: Math.max(1, viewportFor(out.rows)),
         columns: Math.max(20, out.columns || 80),
       });
+      ensurePreview();
       draw();
     };
 
@@ -115,7 +145,10 @@ function pickInteractive(sessions) {
         for (const session of items) batch.push(openInBatch(session));
         return finish(null);
       }
-      if (action === 'move') draw();
+      if (action === 'move') {
+        ensurePreview();
+        draw();
+      }
     }
 
     process.stdin.on('data', onRawData);

@@ -407,3 +407,168 @@ test('sem mtime, a idade usa o dim padrao em vez de quebrar', () => {
   const item = { dir: 'C:\DEV', sessionId: 'id1', agent: 'claude', age: 'agora', summary: 's' };
   assert.doesNotThrow(() => render(createState([item], { viewport: 1, columns: 90, color: true })));
 });
+
+const { previewActive, visibleLength, PREVIEW_BREAKPOINT } = require('../src/selector');
+
+test('preview so ativa com Ctrl+T ligado E largura suficiente', () => {
+  const state = createState(items(3), { viewport: 3, columns: PREVIEW_BREAKPOINT });
+  assert.strictEqual(previewActive(state), false, 'comeca desligado por padrao');
+
+  const ligado = applyKey(state, { name: 't', ctrl: true }).state;
+  assert.strictEqual(previewActive(ligado), true);
+
+  const estreito = { ...ligado, columns: PREVIEW_BREAKPOINT - 1 };
+  assert.strictEqual(previewActive(estreito), false, 'sem largura suficiente, nao mostra mesmo ligado');
+});
+
+test('Ctrl+T so alterna a flag, sem mexer em selecao ou busca', () => {
+  let state = createState(items(5), { viewport: 5, columns: 130 });
+  state = applyKey(state, { name: 'down' }).state;
+
+  const antes = { index: state.index, query: state.query };
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
+  assert.strictEqual(state.index, antes.index);
+  assert.strictEqual(state.query, antes.query);
+});
+
+test('visibleLength ignora codigo ANSI ao contar', () => {
+  const colorido = '\x1b[1m\x1b[36mtexto\x1b[0m';
+  assert.strictEqual(visibleLength(colorido), 5);
+  assert.strictEqual(visibleLength('sem cor'), 7);
+});
+
+test('painel de preview mostra "carregando" quando previewLines e undefined', () => {
+  let state = createState(items(3), { viewport: 3, columns: 130, color: false });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
+  const out = render(state, undefined);
+  assert.ok(out.includes('Loading preview'));
+});
+
+test('painel mostra aviso quando o agente nao tem previa (null)', () => {
+  let state = createState(items(3), { viewport: 3, columns: 130, color: false });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
+  const out = render(state, null);
+  assert.ok(out.includes('No preview for this agent'));
+});
+
+test('painel mostra o conteudo quando previewLines chega preenchido', () => {
+  let state = createState(items(3), { viewport: 3, columns: 130, color: false });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
+  const out = render(state, ['> pergunta do usuario', '  resposta do agente']);
+  assert.ok(out.includes('pergunta do usuario'));
+  assert.ok(out.includes('resposta do agente'));
+});
+
+test('sem Ctrl+T, o conteudo da previa nao aparece mesmo se fornecido', () => {
+  const state = createState(items(3), { viewport: 3, columns: 130, color: false });
+  const out = render(state, ['isso nao deveria aparecer']);
+  assert.ok(!out.includes('isso nao deveria aparecer'));
+});
+
+test('terminal estreito nao mostra previa mesmo com Ctrl+T ligado', () => {
+  let state = createState(items(3), { viewport: 3, columns: 80, color: false });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
+  const out = render(state, ['conteudo que nao cabe']);
+  assert.ok(!out.includes('conteudo que nao cabe'));
+});
+
+test('previa muito longa nao estica o quadro além da lista', () => {
+  let state = createState(items(3), { viewport: 3, columns: 130, color: false });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
+  const previaEnorme = Array.from({ length: 50 }, (_, i) => `linha ${i}`);
+  const linhasSemPreview = render(state, undefined).split('\n').length;
+  const linhasComPreview = render(state, previaEnorme).split('\n').length;
+
+  assert.strictEqual(linhasComPreview, linhasSemPreview, 'a altura do quadro nao muda com o tamanho da previa');
+});
+
+test('linha de preview mais larga que a coluna e cortada, nao estoura', () => {
+  let state = createState(items(3), { viewport: 3, columns: PREVIEW_BREAKPOINT, color: false });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
+  const linhaEnorme = 'x'.repeat(500);
+  const out = render(state, [linhaEnorme]);
+
+  out.split('\n').forEach((l) => assert.ok(l.length <= PREVIEW_BREAKPOINT + 20, `linha suspeita: ${l.length} chars`));
+});
+
+test('o divisor do painel fica na mesma coluna em toda linha, mesmo com cores variando', () => {
+  const variados = [
+    { dir: 'C:\DEV', sessionId: 'id1', agent: 'claude', age: 'agora', mtime: Date.now(), branch: 'master', summary: 'a' },
+    { dir: 'C:\DEV', sessionId: 'id2', agent: 'codex', age: '3d atras', mtime: Date.now() - 3 * 86400000, tokens: 500000, tokensKind: 'cumulative', summary: 'b' },
+  ];
+
+  let state = createState(variados, { viewport: 5, columns: 130, color: true });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
+  const out = render(state, ['linha da previa']);
+  const posicoes = out
+    .split('\n')
+    .filter((l) => (l.includes('claude') || l.includes('codex')) && l.includes('│'))
+    .map((l) => visibleLength(l.slice(0, l.indexOf('│'))));
+
+  // Cada linha tem cores diferentes (idade verde/dim, branch, tokens) mas o
+  // divisor precisa cair na mesma coluna visivel em todas - senao o
+  // alinhamento do painel desmancha conforme o conteudo de cada sessao.
+  const distintas = new Set(posicoes.map((p) => Math.round(p)));
+  assert.ok(distintas.size <= 1, `divisor em colunas diferentes: ${[...distintas]}`);
+});
+
+test('titulo comprido demais para a coluna esquerda e cortado, nao estoura o divisor', () => {
+  const longo = [
+    {
+      dir: 'C:\DEV',
+      sessionId: 'id1',
+      agent: 'codex',
+      age: '109d atras',
+      mtime: Date.now(),
+      summary:
+        'To com um problema na exibição dos dados na table no frete maritimo nessa pasta gigante de verdade que nao cabe em lugar nenhum',
+    },
+  ];
+
+  let state = createState(longo, { viewport: 3, columns: 130, color: false });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
+  const out = render(state, null);
+  const corpo = out.split('\n').filter((l) => l.includes('│') && !l.includes('⌕'));
+
+  corpo.forEach((linha) => {
+    assert.ok(linha.length <= 130 + 5, `linha ultrapassou a largura do terminal: ${linha.length} chars`);
+  });
+
+  // A posicao do divisor precisa ser consistente mesmo quando o texto original
+  // era bem mais comprido que a coluna reservada pra ele.
+  const posicoes = new Set(corpo.map((l) => l.indexOf('│')));
+  assert.strictEqual(posicoes.size, 1, `divisor fora de posicao: ${[...posicoes]}`);
+});
+
+test('titulo comprido colorido nao vaza cor pro lado do preview', () => {
+  const longo = [
+    {
+      dir: 'C:\DEV',
+      sessionId: 'id1',
+      agent: 'claude',
+      age: 'agora',
+      mtime: Date.now(),
+      summary: 'x'.repeat(200),
+    },
+  ];
+
+  let state = createState(longo, { viewport: 3, columns: 130, color: true });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+  state = applyKey(state, { name: 'down' }).state; // desmarca como selecionado, usa a cor do meta
+
+  const out = render(state, ['previa']);
+  const linhaMeta = out.split('\n').find((l) => l.includes('previa'));
+
+  // Depois do reset (\x1b[0m) que fecha o texto truncado, nao pode sobrar
+  // outro codigo de cor ainda aberto antes do divisor.
+  assert.ok(linhaMeta.includes('\x1b[0m'), 'a linha cortada fecha a cor com reset');
+});

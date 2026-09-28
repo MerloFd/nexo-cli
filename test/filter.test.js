@@ -159,7 +159,7 @@ test('render respeita largura tambem com busca ativa', () => {
 });
 
 test('a dica de rodape muda quando ha busca', () => {
-  const vazio = createState(SAMPLE, { viewport: 5, columns: 100, color: false });
+  const vazio = createState(SAMPLE, { viewport: 5, columns: 120, color: false });
   assert.ok(render(vazio).includes('type to search'));
 
   const buscando = type(vazio, 'so');
