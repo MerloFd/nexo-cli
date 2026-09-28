@@ -55,6 +55,12 @@ and, once empty, quits.
 **Ctrl+A** switches scope: every folder on the machine, or only the one you ran
 the command from. The header says which is active.
 
+**Ctrl+Enter** opens the highlighted session as a tab of a single instance and
+keeps the list open, so you can keep picking more — each one lands as another
+tab of that same instance instead of a separate window. A ✓ marks what you
+already sent. Plain Enter is unaffected: it still opens one session and closes
+the list, as before.
+
 The label is the session's real name: the one you set with `/rename`, or the one
 the agent generated, or your first message — in that order.
 
@@ -81,6 +87,11 @@ None of them is required, and if one fails the next takes over.
 Inside the VS Code integrated terminal the session opens in an external
 terminal: VS Code exposes no API to create a tab from the command line
 ([vscode#238786](https://github.com/microsoft/vscode/issues/238786)).
+
+With Herdr, Ctrl+Enter opens each tab in the background so the list keeps
+focus and you can keep picking. Windows Terminal has no such option — opening
+a tab there will steal focus, so you may need to switch back to the list
+window before pressing Ctrl+Enter again.
 
 ## nexo scan
 

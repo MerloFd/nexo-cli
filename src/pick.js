@@ -1,6 +1,9 @@
 const readline = require('readline');
+const { PassThrough } = require('stream');
 const { daysAgo } = require('./scanSessions');
-const { createState, applyKey, render, syncOffset } = require('./selector');
+const { createState, applyKey, render, syncOffset, markSent } = require('./selector');
+const { extractCtrlEnter } = require('./ctrlEnter');
+const { openSession } = require('./backends');
 
 const ALT_SCREEN_ON = '\x1b[?1049h';
 const ALT_SCREEN_OFF = '\x1b[?1049l';
@@ -29,9 +32,23 @@ function viewportFor(rows) {
   return Math.max(1, Math.floor(((rows || 24) - 7) / 2));
 }
 
+// Ctrl+Enter abre a sessao destacada sem fechar o seletor, para juntar varias
+// numa unica instancia. A abertura acontece na hora, nao no final: se o
+// usuario sair sem dar Enter em mais nada, o que ja foi enviado continua
+// aberto.
+function openInBatch(session) {
+  try {
+    const { backend, failures } = openSession(session, undefined, { background: true });
+    return { session, backend, failures };
+  } catch (err) {
+    return { session, backend: null, failures: [err.message] };
+  }
+}
+
 function pickInteractive(sessions) {
   const rows = toRows(sessions);
   const out = process.stdout;
+  const batch = [];
 
   let state = createState(rows, {
     viewport: viewportFor(out.rows),
@@ -41,7 +58,21 @@ function pickInteractive(sessions) {
   });
 
   return new Promise((resolve) => {
-    readline.emitKeypressEvents(process.stdin);
+    // O Windows Terminal manda Ctrl+Enter como sequencia de escape que o
+    // decodificador padrao do readline nao entende (ver src/ctrlEnter.js).
+    // Por isso os bytes crus passam primeiro por um filtro proprio, e so o
+    // que sobra chega ao decodificador de teclas, via este stream intermediario.
+    const decoded = new PassThrough();
+    readline.emitKeypressEvents(decoded);
+
+    let carry = '';
+    function onRawData(chunk) {
+      const found = extractCtrlEnter(chunk.toString('latin1'), carry);
+      carry = found.carry;
+      for (let i = 0; i < found.hits; i++) onCtrlEnter();
+      if (found.remainder) decoded.write(Buffer.from(found.remainder, 'latin1'));
+    }
+
     const wasRaw = process.stdin.isRaw;
     process.stdin.setRawMode(true);
     process.stdin.resume();
@@ -60,13 +91,23 @@ function pickInteractive(sessions) {
     };
 
     const finish = (result) => {
-      process.stdin.removeListener('keypress', onKeypress);
+      process.stdin.removeListener('data', onRawData);
+      decoded.removeListener('keypress', onKeypress);
       out.removeListener('resize', onResize);
       out.write(CURSOR_SHOW + ALT_SCREEN_OFF);
       if (process.stdin.isTTY) process.stdin.setRawMode(Boolean(wasRaw));
       process.stdin.pause();
-      resolve(result);
+      resolve({ chosen: result, batch });
     };
+
+    function onCtrlEnter() {
+      const item = state.items[state.index];
+      if (!item) return;
+
+      state = markSent(state, item.sessionId);
+      batch.push(openInBatch(item.ref));
+      draw();
+    }
 
     function onKeypress(_str, key) {
       const { state: next, action } = applyKey(state, key || {});
@@ -77,7 +118,8 @@ function pickInteractive(sessions) {
       if (action === 'move') draw();
     }
 
-    process.stdin.on('keypress', onKeypress);
+    process.stdin.on('data', onRawData);
+    decoded.on('keypress', onKeypress);
     out.on('resize', onResize);
   });
 }
@@ -101,13 +143,13 @@ function pickNonInteractive(sessions) {
     rl.question('\nEscolha o numero (Enter cancela): ', (answer) => {
       rl.close();
       const trimmed = answer.trim();
-      if (!trimmed) return resolve(null);
+      if (!trimmed) return resolve({ chosen: null, batch: [] });
 
       const idx = Number(trimmed) - 1;
       if (!Number.isInteger(idx) || idx < 0 || idx >= sessions.length) {
         return reject(new Error(`Opcao invalida: ${trimmed}`));
       }
-      resolve(sessions[idx]);
+      resolve({ chosen: sessions[idx], batch: [] });
     });
   });
 }

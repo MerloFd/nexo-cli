@@ -32,7 +32,7 @@ function makeHome() {
   return home;
 }
 
-function run(args, { home = makeHome(), expectFail = false } = {}) {
+function run(args, { home = makeHome(), expectFail = false, input } = {}) {
   const env = {
     ...process.env,
     HOME: home,
@@ -45,7 +45,7 @@ function run(args, { home = makeHome(), expectFail = false } = {}) {
   };
 
   try {
-    const stdout = execFileSync(process.execPath, [CLI, ...args], { env, encoding: 'utf8' });
+    const stdout = execFileSync(process.execPath, [CLI, ...args], { env, encoding: 'utf8', input });
     assert.ok(!expectFail, 'esperava falha mas o comando teve sucesso');
     return stdout;
   } catch (err) {
@@ -105,4 +105,17 @@ test('sem sessoes nenhuma falha com mensagem clara', () => {
   const vazio = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-vazio-'));
   const out = run(['--list'], { home: vazio, expectFail: true });
   assert.match(out, /No agent session found/);
+});
+
+test('fluxo sem args funciona no modo nao interativo (pipe) e resolve {chosen,batch}', () => {
+  const out = run([], { input: '1\n' });
+  assert.match(out, /Alpha/, 'lista as sessoes antes de perguntar');
+  assert.match(out, /Beta/);
+  assert.match(out, /Opening C:\\DEV\\Beta/, 'abre a escolhida (item 1 da lista)');
+});
+
+test('cancelar no modo nao interativo nao imprime nada do lote', () => {
+  const out = run([], { input: '\n' });
+  assert.match(out, /Cancelled\./);
+  assert.doesNotMatch(out, /Opening/);
 });

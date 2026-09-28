@@ -241,3 +241,45 @@ test('cores entram quando color=true', () => {
   const state = createState(items(3), { viewport: 3, color: true });
   assert.ok(render(state).includes('\x1b['));
 });
+
+test('markSent adiciona a sessao ao conjunto enviado', () => {
+  const { createState, markSent } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3 });
+
+  assert.strictEqual(state.sent.size, 0);
+  state = markSent(state, 'id000001');
+  assert.ok(state.sent.has('id000001'));
+});
+
+test('markSent nao afeta a selecao nem a busca', () => {
+  const { createState, markSent, applyKey } = require('../src/selector');
+  let state = createState(items(5), { viewport: 5 });
+  state = applyKey(state, { name: 'down' }).state;
+
+  const indexAntes = state.index;
+  state = markSent(state, 'id000001');
+
+  assert.strictEqual(state.index, indexAntes, 'marcar nao move o cursor');
+});
+
+test('item enviado ganha marcador visual quando nao esta selecionado', () => {
+  const { createState, markSent, render } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3, columns: 80, color: false });
+  state = markSent(state, 'id000001');
+
+  const linhas = render(state).split('\n');
+  const linhaEnviada = linhas.find((l) => l.includes('resumo da sessao 1'));
+
+  assert.ok(linhaEnviada.startsWith('✓ '), 'marca com check quem ja foi aberto');
+});
+
+test('marcador de enviado some quando o item esta selecionado', () => {
+  const { createState, markSent, applyKey, render } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3, columns: 80, color: false });
+  state = markSent(state, 'id000000');
+
+  const linhas = render(state).split('\n');
+  const atual = linhas.find((l) => l.includes('resumo da sessao 0'));
+
+  assert.ok(atual.startsWith('> '), 'selecao tem prioridade visual sobre o check');
+});

@@ -23,7 +23,7 @@ function assertValidSession(session) {
   }
 }
 
-function openSession(session, backends = BACKENDS) {
+function openSession(session, backends = BACKENDS, opts = {}) {
   assertValidSession(session);
   const command = resumeArgs(session);
 
@@ -41,7 +41,7 @@ function openSession(session, backends = BACKENDS) {
     if (!usable) continue;
 
     try {
-      backend.open(session, command);
+      backend.open(session, command, opts);
       return { backend: backend.name, command, failures };
     } catch (err) {
       failures.push(`${backend.name}: ${err.message}`);

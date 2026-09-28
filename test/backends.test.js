@@ -184,3 +184,30 @@ test('a cadeia prefere aba a janela, e janela a imprimir comando', () => {
   assert.ok(ordem.indexOf('windows-console') < ordem.indexOf('fallback'), 'janela antes do fallback');
   assert.strictEqual(ordem[ordem.length - 1], 'fallback', 'fallback e sempre o ultimo');
 });
+
+test('wt.exe recebe -w antes do subcomando new-tab', (t) => {
+  const cp = require('child_process');
+  const spawnMock = t.mock.method(cp, 'spawn', () => ({ unref: () => {} }));
+
+  delete require.cache[require.resolve('../src/backends/windowsTerminal')];
+  const windowsTerminal = require('../src/backends/windowsTerminal');
+
+  windowsTerminal.open(
+    { dir: 'C:\DEV' },
+    ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268']
+  );
+
+  assert.strictEqual(spawnMock.mock.calls.length, 1);
+  const [bin, args] = spawnMock.mock.calls[0].arguments;
+
+  assert.strictEqual(bin, 'wt.exe');
+  const iw = args.indexOf('-w');
+  const iNewTab = args.indexOf('new-tab');
+
+  assert.notStrictEqual(iw, -1, 'wt.exe precisa da flag -w');
+  assert.notStrictEqual(iNewTab, -1, 'wt.exe precisa do subcomando new-tab');
+  assert.ok(
+    iw < iNewTab,
+    '-w e opcao global do wt.exe: depois de new-tab ele vira argumento solto do subcomando e a janela nunca abre'
+  );
+});

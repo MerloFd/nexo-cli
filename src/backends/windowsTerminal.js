@@ -11,9 +11,13 @@ function available() {
 }
 
 function open(session, command) {
+  // -w e opcao global do wt.exe: precisa vir ANTES do subcomando. Depois de
+  // new-tab, o parser trata "-w" e "0" como argumentos soltos do subcomando,
+  // que os interpreta como o proprio executavel a rodar - e falha tentando
+  // iniciar um processo chamado "0".
   const child = spawn('wt.exe', [
-    'new-tab',
     '-w', '0',
+    'new-tab',
     '-d', session.dir,
     'powershell', '-NoExit', '-Command', command.join(' '),
   ], { detached: true, stdio: 'ignore' });

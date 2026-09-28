@@ -54,7 +54,18 @@ function createState(items, { viewport = 10, columns = 80, color = true, cwd = n
     query: '',
     cwd,
     scope,
+    sent: new Set(),
   };
+}
+
+// Ctrl+Enter abre a sessao destacada como aba de uma unica instancia e
+// continua no seletor, em vez de fechar como o Enter normal. O item marcado
+// so serve de retorno visual - quem realmente abre o terminal e quem chama
+// esta funcao.
+function markSent(state, sessionId) {
+  const sent = new Set(state.sent);
+  sent.add(sessionId);
+  return { ...state, sent };
 }
 
 function syncOffset(state) {
@@ -201,7 +212,7 @@ function metaLine(item) {
 }
 
 function renderItem(state, item, selected) {
-  const marker = selected ? '> ' : '  ';
+  const marker = selected ? '> ' : state.sent.has(item.sessionId) ? '✓ ' : '  ';
   const label = item.title || item.summary;
   const head = truncate(`${marker}${label}`, state.columns);
   const meta = truncate(`    ${metaLine(item)}`, state.columns);
@@ -286,6 +297,7 @@ module.exports = {
   setQuery,
   toggleScope,
   inScope,
+  markSent,
   filterItems,
   normalize,
   ANSI,

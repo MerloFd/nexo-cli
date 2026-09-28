@@ -28,6 +28,7 @@ In the list:
   arrows, ctrl+p/n    move
   ctrl+a              switch between every folder and the current one
   enter               open the session
+  ctrl+enter          add the session as a tab of one instance, keep browsing
   esc                 clears the search; with it empty, quits
 `;
 
@@ -142,7 +143,23 @@ async function main() {
     return;
   }
 
-  const chosen = await pickSession(sessions);
+  const { chosen, batch } = await pickSession(sessions);
+
+  // O lote foi aberto ao vivo, tecla a tecla, sem nenhuma linha impressa
+  // porque a tela estava em modo alternativo; o relatorio so sai agora.
+  for (const entry of batch) {
+    entry.failures.forEach((f) => console.error(t('cli.warning', { message: f })));
+    if (entry.backend) {
+      console.log(
+        t('cli.opening', {
+          dir: entry.session.dir,
+          id: entry.session.sessionId.slice(0, 8),
+          backend: entry.backend,
+        })
+      );
+    }
+  }
+
   if (!chosen) {
     console.log(t('cli.cancelled'));
     if (primeiraVez) console.log(t('cli.langHint'));
