@@ -17,6 +17,7 @@ function toRows(sessions) {
     sessionId: s.sessionId,
     agent: s.agent,
     age: daysAgo(s.mtime),
+    mtime: s.mtime,
     branch: s.branch || null,
     bytes: s.bytes || null,
     tokens: s.tokens || null,

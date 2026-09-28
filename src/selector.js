@@ -7,6 +7,7 @@ const ANSI = {
   bold: '\x1b[1m',
   cyan: '\x1b[36m',
   yellow: '\x1b[33m',
+  green: '\x1b[32m',
 };
 
 function normalize(text) {
@@ -235,16 +236,44 @@ function metaLine(item) {
     .join(' · ');
 }
 
+// Sessao mexida ha pouco fica verde, hoje fica ciano, essa semana fica
+// amarela, mais antiga que isso usa o dim padrao - sinaliza de relance o que
+// vale revisitar sem precisar ler o texto do age.
+function ageColor(mtimeMs) {
+  if (mtimeMs == null) return ANSI.dim;
+  const horas = (Date.now() - mtimeMs) / 3600000;
+  if (horas < 1) return ANSI.green;
+  if (horas < 24) return ANSI.cyan;
+  if (horas < 24 * 7) return ANSI.yellow;
+  return ANSI.dim;
+}
+
+// So colore por segmento quando a linha cabe inteira sem cortar - cortar uma
+// string ja colorida no meio de um codigo ANSI corrompe o restante da linha.
+// Sem espaco, cai de volta no dim uniforme de sempre.
+function renderColoredMeta(state, item) {
+  const segmentos = [
+    { texto: item.agent, cor: ANSI.dim },
+    { texto: item.age, cor: ageColor(item.mtime) },
+    { texto: item.branch, cor: ANSI.dim },
+    { texto: formatBytes(item.bytes), cor: ANSI.dim },
+    { texto: formatTokens(item.tokens, item.tokensKind), cor: ANSI.dim },
+  ].filter((s) => s.texto);
+
+  const separador = paint(state, ANSI.dim, ' · ');
+  return `    ${segmentos.map((s) => paint(state, s.cor, s.texto)).join(separador)}`;
+}
+
 function renderItem(state, item, selected) {
   const marker = selected ? '> ' : state.marked.has(item.sessionId) ? '✓ ' : '  ';
   const label = item.title || item.summary;
   const head = truncate(`${marker}${label}`, state.columns);
-  const meta = truncate(`    ${metaLine(item)}`, state.columns);
 
-  return [
-    selected ? paint(state, ANSI.bold + ANSI.cyan, head) : head,
-    paint(state, ANSI.dim, meta),
-  ];
+  const metaPlano = `    ${metaLine(item)}`;
+  const cabe = metaPlano.length <= state.columns;
+  const meta = cabe ? renderColoredMeta(state, item) : paint(state, ANSI.dim, truncate(metaPlano, state.columns));
+
+  return [selected ? paint(state, ANSI.bold + ANSI.cyan, head) : head, meta];
 }
 
 function paint(state, code, text) {

@@ -346,3 +346,64 @@ test('marca sobrevive a busca que esconde o item da tela', () => {
   assert.strictEqual(result.action, 'open-batch');
   assert.strictEqual(result.items[0].sessionId, 'id000000', 'a marca nao se perde com o filtro');
 });
+
+test('idade recente, de hoje, da semana e antiga ganham cores diferentes', () => {
+  const base = { dir: 'C:\DEV', sessionId: 'id1', agent: 'claude', summary: 's' };
+  const agora = Date.now();
+
+  // A linha selecionada (unica de cada lista) sempre ganha ciano no titulo -
+  // isolar a linha de METADADOS (a segunda) evita que essa cor de selecao se
+  // misture com a cor de idade que o teste quer checar.
+  const metaLinhas = [
+    { ...base, age: 'agora', mtime: agora - 30 * 60 * 1000 },
+    { ...base, age: '5h atras', mtime: agora - 5 * 3600 * 1000 },
+    { ...base, age: '3d atras', mtime: agora - 3 * 86400 * 1000 },
+    { ...base, age: '2mo atras', mtime: agora - 60 * 86400 * 1000 },
+  ].map((item) => {
+    const linhas = render(createState([item], { viewport: 1, columns: 90, color: true })).split('\n');
+    return linhas.find((l) => l.includes('claude'));
+  });
+
+  assert.ok(metaLinhas[0].includes('\x1b[32m'), 'recente (< 1h) e verde');
+  assert.ok(metaLinhas[1].includes('\x1b[36m'), 'de hoje (< 24h) e ciano');
+  assert.ok(metaLinhas[2].includes('\x1b[33m'), 'da semana (< 7d) e amarelo');
+  assert.ok(
+    !metaLinhas[3].includes('\x1b[32m') && !metaLinhas[3].includes('\x1b[36m') && !metaLinhas[3].includes('\x1b[33m'),
+    'antiga nao usa nenhuma das cores de recente'
+  );
+});
+
+test('sem cor habilitada, a idade nao carrega nenhum codigo ANSI', () => {
+  const item = { dir: 'C:\DEV', sessionId: 'id1', agent: 'claude', age: 'agora', mtime: Date.now(), summary: 's' };
+  const out = render(createState([item], { viewport: 1, columns: 90, color: false }));
+
+  assert.ok(!out.includes('\x1b['));
+  assert.ok(out.includes('agora'));
+});
+
+test('linha que precisa truncar cai de volta no dim uniforme, sem quebrar cor', () => {
+  const item = {
+    dir: 'C:\DEV',
+    sessionId: 'id1',
+    agent: 'claude',
+    age: 'agora',
+    mtime: Date.now(),
+    branch: 'uma-branch-com-nome-bem-comprido-para-forcar-o-corte-da-linha',
+    summary: 's',
+  };
+
+  const out = render(createState([item], { viewport: 1, columns: 30, color: true }));
+  const linhas = out.split('\n').filter((l) => l.trim());
+
+  // A linha de metadados cortada deve caber no limite e nao deixar um codigo
+  // ANSI pela metade (o que corromperia o resto do terminal).
+  const meta = linhas.find((l) => l.includes('claude'));
+  assert.ok(meta);
+  const semCores = meta.replace(/\x1b\[[0-9]*m/g, '');
+  assert.ok(semCores.length <= 30, `linha visivel excede a largura: "${semCores}" (${semCores.length})`);
+});
+
+test('sem mtime, a idade usa o dim padrao em vez de quebrar', () => {
+  const item = { dir: 'C:\DEV', sessionId: 'id1', agent: 'claude', age: 'agora', summary: 's' };
+  assert.doesNotThrow(() => render(createState([item], { viewport: 1, columns: 90, color: true })));
+});
