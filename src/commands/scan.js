@@ -1,6 +1,28 @@
 const { scanSessions } = require('../scan');
+const { redactFile, isPossiblyActive } = require('../scan/redact');
 const { daysAgo } = require('../scanSessions');
 const { t } = require('../i18n');
+
+// V1 do redact so cobre Claude: e o unico agente que ainda grava sessao como
+// arquivo texto que da para reescrever linha a linha. O Codex atual guarda em
+// SQLite, e mexer num banco pede outra abordagem, ainda nao feita.
+function redactCandidates(results) {
+  return results.filter(
+    (r) => r.agent === 'claude' && r.findings.some((f) => f.confidence === 'alta')
+  );
+}
+
+function applyRedactions(results) {
+  const candidatos = redactCandidates(results);
+  const puladas = candidatos.filter((r) => isPossiblyActive(r.mtime));
+  const alvo = candidatos.filter((r) => !isPossiblyActive(r.mtime));
+
+  const feitas = alvo
+    .map((r) => ({ result: r, outcome: redactFile(r.filePath) }))
+    .filter((entry) => entry.outcome.changed > 0 || entry.outcome.error);
+
+  return { feitas, puladas };
+}
 
 function contar(results, confidence) {
   return results.reduce(
@@ -68,10 +90,41 @@ function printReport(results) {
   }
 }
 
+function printRedactReport({ feitas, puladas }) {
+  console.log('');
+
+  if (feitas.length === 0 && puladas.length === 0) {
+    console.log(t('scan.redact.nothing'));
+    return;
+  }
+
+  console.log(t('scan.redact.title'));
+  console.log('');
+
+  for (const { result, outcome } of feitas) {
+    const rotulo = result.title || result.sessionId.slice(0, 8);
+    if (outcome.error) {
+      console.log(`  ${rotulo}: ${t('cli.warning', { message: outcome.error })}`);
+    } else {
+      console.log(`  ${rotulo}: ${t('scan.redact.count', { n: outcome.changed })}`);
+    }
+  }
+
+  if (puladas.length > 0) {
+    console.log('');
+    console.log(t('scan.redact.skippedActive', { n: puladas.length }));
+    for (const r of puladas) console.log(`  ${r.title || r.sessionId.slice(0, 8)}`);
+  }
+
+  console.log('');
+  console.log(t('scan.redact.note1'));
+  console.log(t('scan.redact.note2'));
+}
+
 // A saida legivel por maquina carrega apenas metadado: tipo, contagem e
 // localizacao. Nunca o valor. Assim ela pode ser agregada por terceiros sem
 // transportar o segredo junto.
-function printJson(results) {
+function printJson(results, redacted) {
   const payload = results.map((r) => ({
     agent: r.agent,
     sessionId: r.sessionId,
@@ -87,10 +140,34 @@ function printJson(results) {
     })),
   }));
 
-  console.log(JSON.stringify(payload, null, 2));
+  // Sem --redact, mantem o formato de sempre (lista plana) para nao quebrar
+  // quem ja consome esse JSON. So com --redact o formato ganha essa segunda
+  // chave, porque so ai existe outra coisa para reportar.
+  if (!redacted) {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        findings: payload,
+        redacted: {
+          sessions: redacted.feitas.map(({ result, outcome }) => ({
+            sessionId: result.sessionId,
+            occurrencesRemoved: outcome.changed || 0,
+            error: outcome.error || null,
+          })),
+          skippedPossiblyActive: redacted.puladas.map((r) => r.sessionId),
+        },
+      },
+      null,
+      2
+    )
+  );
 }
 
-async function run(sessions, { json = false } = {}) {
+async function run(sessions, { json = false, redact = false } = {}) {
   const comArquivo = sessions.filter((s) => s.filePath);
 
   if (!json) {
@@ -98,11 +175,17 @@ async function run(sessions, { json = false } = {}) {
   }
 
   const results = await scanSessions(comArquivo);
+  const redacted = redact ? applyRedactions(results) : null;
 
-  if (json) printJson(results);
-  else printReport(results);
+  if (json) {
+    printJson(results, redacted);
+  } else {
+    printReport(results);
+    if (redacted) printRedactReport(redacted);
+  }
 
+  if (redacted) return redacted.feitas.some((f) => f.outcome.error) ? 1 : 0;
   return results.length > 0 ? 2 : 0;
 }
 
-module.exports = { run, printReport, printJson };
+module.exports = { run, printReport, printJson, redactCandidates, applyRedactions };

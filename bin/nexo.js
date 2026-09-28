@@ -20,6 +20,7 @@ Usage:
 Options:
   --list              just print the sessions
   --json              JSON output (works for scan and usage too)
+  --redact            in scan, remove high-confidence secrets (Claude only)
   --week              in usage, group by week instead of day
   --open <id>         open that session directly (a prefix is enough)
 
@@ -35,7 +36,7 @@ In the list:
 const COMMANDS = new Set(['scan', 'usage', 'lang']);
 
 function parseArgs(argv) {
-  const flags = { list: false, json: false, help: false, open: null, week: false };
+  const flags = { list: false, json: false, help: false, open: null, week: false, redact: false };
   const terms = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -44,6 +45,7 @@ function parseArgs(argv) {
     else if (arg === '--list' || arg === '-l') flags.list = true;
     else if (arg === '--json') flags.json = true;
     else if (arg === '--week' || arg === '--semana') flags.week = true;
+    else if (arg === '--redact') flags.redact = true;
     else if (arg === '--open') flags.open = argv[++i] || '';
     else if (!arg.startsWith('-')) terms.push(arg);
   }
@@ -106,7 +108,7 @@ async function main() {
   const sessions = query ? filterItems(all, query) : all;
 
   if (command === 'scan') {
-    process.exitCode = await require('../src/commands/scan').run(sessions, { json: flags.json });
+    process.exitCode = await require('../src/commands/scan').run(sessions, { json: flags.json, redact: flags.redact });
     return;
   }
 

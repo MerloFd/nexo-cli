@@ -119,3 +119,58 @@ test('cancelar no modo nao interativo nao imprime nada do lote', () => {
   assert.match(out, /Cancelled\./);
   assert.doesNotMatch(out, /Opening/);
 });
+
+function makeHomeWithSecret() {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-cli-secret-'));
+  const proj = path.join(home, '.claude', 'projects', 'C--DEV');
+  fs.mkdirSync(proj, { recursive: true });
+
+  // Valor sintetico montado em runtime: formato valido, conteudo inventado.
+  // Ver test/scan.test.js - uma string com formato real de credencial,
+  // mesmo falsa, ja disparou o scanner de segredo do GitHub neste repo.
+  const fakeAws = `AK${'IA'}${'Q'.repeat(16)}`;
+  const file = path.join(proj, 'ccc33333-3333-3333-3333-333333333333.jsonl');
+
+  fs.writeFileSync(
+    file,
+    [
+      JSON.stringify({ cwd: 'C:\DEV\Gamma', sessionId: 'ccc33333-3333-3333-3333-333333333333' }),
+      JSON.stringify({ type: 'user', message: { role: 'user', content: `minha chave: ${fakeAws}` } }),
+    ].join('\n'),
+    'utf8'
+  );
+
+  // Sessao fora da janela de "possivelmente ativa" (5 minutos) do redact.
+  const antiga = new Date(Date.now() - 10 * 60 * 1000);
+  fs.utimesSync(file, antiga, antiga);
+
+  return { home, file, fakeAws };
+}
+
+test('scan encontra o segredo sem imprimir o valor', () => {
+  const { home, fakeAws } = makeHomeWithSecret();
+  const out = run(['scan'], { home, expectFail: true });
+
+  assert.match(out, /AWS access key/i);
+  assert.doesNotMatch(out, new RegExp(fakeAws), 'o valor never aparece no relatorio');
+});
+
+test('scan --redact remove o segredo do arquivo de verdade', () => {
+  const { home, file, fakeAws } = makeHomeWithSecret();
+
+  run(['scan', '--redact'], { home });
+
+  const depois = fs.readFileSync(file, 'utf8');
+  assert.ok(!depois.includes(fakeAws), 'o valor sumiu do arquivo');
+  assert.ok(depois.includes('[REDACTED]'));
+  assert.doesNotThrow(() => depois.split('\n').filter(Boolean).forEach((l) => JSON.parse(l)), 'continua JSON valido');
+});
+
+test('scan --redact --json nunca inclui o valor do segredo', () => {
+  const { home, fakeAws } = makeHomeWithSecret();
+  const out = run(['scan', '--redact', '--json'], { home });
+
+  assert.doesNotMatch(out, new RegExp(fakeAws));
+  const parsed = JSON.parse(out);
+  assert.ok(parsed.redacted.sessions[0].occurrencesRemoved >= 1);
+});

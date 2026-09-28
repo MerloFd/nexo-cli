@@ -120,6 +120,29 @@ Two things the report makes explicit:
 `nexo scan --json` returns metadata only — type, count and location. Never the
 secret itself.
 
+### `--redact`
+
+```
+nexo scan --redact
+```
+
+Removes high-confidence secrets in place, replacing the value with
+`[REDACTED]` and keeping the line valid JSON. Deliberately narrow, for now:
+
+- **Claude Code only.** Codex now stores sessions in SQLite, which needs a
+  different rewrite approach that isn't built yet.
+- **High-confidence findings only** (a real key/token shape). Medium and low
+  confidence findings can be quoted code or noise, and rewriting one by
+  mistake is not reversible — those are left alone; review them by hand.
+- **A session changed in the last 5 minutes is skipped**, since a live agent
+  may still be appending to that same file — rewriting under it could
+  corrupt the next write. This is a heuristic, not a guarantee.
+- For a private key, the **whole PEM block** is removed, not just the
+  `-----BEGIN...-----` marker line the report shows.
+
+This only removes the **local copy**. The secret was already sent to the
+provider with the conversation — rotate it; `--redact` does not undo that.
+
 ## nexo usage
 
 Token overview by day (or `--week`), agent, model and project.

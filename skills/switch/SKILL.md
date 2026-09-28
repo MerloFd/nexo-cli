@@ -89,8 +89,10 @@ que merecem conferencia antes de qualquer acao.
 Se houver achado de alta confianca, a orientacao e sempre a mesma, nessa
 ordem: **1)** rotacionar a credencial (ela ja foi enviada ao provedor junto
 com a conversa, apagar o log local nao desfaz isso); **2)** so depois, se
-quiser, limpar o log local. Nao existe comando de limpeza automatica ainda -
-nao ofereca isso ao usuario.
+quiser, `nexo scan --redact` remove a copia local (so sessoes do Claude, so
+achados de alta confianca). Explique que isso nao desfaz o vazamento, so
+reduz a exposicao local, e confirme com o usuario antes de rodar - reescreve
+o arquivo original de outro programa.
 
 ## Mostrar uso de tokens
 

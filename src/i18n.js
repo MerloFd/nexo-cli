@@ -40,6 +40,13 @@ const MESSAGES = {
     'scan.advice.3': '  2. Then clean the local log, which sits in plain text in your profile and',
     'scan.advice.4': '     can be read by any process running as you.',
 
+    'scan.redact.title': 'REDACTING (high-confidence findings only, Claude sessions only):',
+    'scan.redact.count': '{n} occurrence(s) removed',
+    'scan.redact.nothing': 'Nothing to redact: no high-confidence finding in a Claude session.',
+    'scan.redact.skippedActive': '{n} session(s) skipped - changed in the last few minutes, might be in use by a running agent:',
+    'scan.redact.note1': 'This only covers Claude Code sessions for now, and only removes the local',
+    'scan.redact.note2': 'copy of the secret - rotate the credential, this does not undo the leak.',
+
     'usage.empty': 'No token usage found.',
     'usage.total': 'Total: {tokens} tokens across {turns} turns',
     'usage.input': 'input',
@@ -96,6 +103,13 @@ const MESSAGES = {
     'scan.advice.2': '     provedor junto com a conversa - apagar o arquivo local nao desfaz isso.',
     'scan.advice.3': '  2. Depois limpe o log local, que fica em texto puro no seu perfil e pode',
     'scan.advice.4': '     ser lido por qualquer processo rodando com o seu usuario.',
+
+    'scan.redact.title': 'REDIGINDO (so achados de alta confianca, so sessoes do Claude):',
+    'scan.redact.count': '{n} ocorrencia(s) removida(s)',
+    'scan.redact.nothing': 'Nada para redigir: nenhum achado de alta confianca em sessao do Claude.',
+    'scan.redact.skippedActive': '{n} sessao(oes) pulada(s) - mudou ha poucos minutos, pode estar em uso por um agente rodando:',
+    'scan.redact.note1': 'Isso so cobre sessoes do Claude Code por enquanto, e so remove a copia local',
+    'scan.redact.note2': 'do segredo - rotacione a credencial, isso nao desfaz o vazamento.',
 
     'usage.empty': 'Nenhum uso de token encontrado.',
     'usage.total': 'Total: {tokens} tokens em {turns} turnos',
