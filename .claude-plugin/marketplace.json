@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "nexo",
-  "description": "Switcher global de sessoes do Claude Code entre repositorios.",
+  "description": "Switcher global de sessoes de agentes de IA de terminal entre repositorios.",
   "owner": {
     "name": "Matheus Merlo"
   },

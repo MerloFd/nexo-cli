@@ -1,7 +1,7 @@
 {
   "name": "nexo",
   "version": "0.1.0",
-  "description": "Lista as sessoes do Claude Code de todos os repositorios e abre a escolhida em um terminal novo, ja resumida.",
+  "description": "Lista as sessoes de agentes de IA de terminal (Claude Code, Codex, opencode) de todos os repositorios e abre a escolhida em um terminal novo, ja resumida.",
   "author": {
     "name": "Matheus Merlo"
   },
