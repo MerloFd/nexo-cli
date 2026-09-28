@@ -55,11 +55,12 @@ and, once empty, quits.
 **Ctrl+A** switches scope: every folder on the machine, or only the one you ran
 the command from. The header says which is active.
 
-**Ctrl+Enter** opens the highlighted session as a tab of a single instance and
-keeps the list open, so you can keep picking more — each one lands as another
-tab of that same instance instead of a separate window. A ✓ marks what you
-already sent. Plain Enter is unaffected: it still opens one session and closes
-the list, as before.
+**Tab** marks the highlighted session (✓) and moves to the next one — it opens
+nothing by itself. Mark as many as you like, then **Enter** opens all of them
+at once, as tabs of a single instance instead of separate windows. Marks
+survive searching and switching scope, so you can mark, filter for something
+else, and mark more. With nothing marked, Enter keeps its plain behavior:
+opens the highlighted session and closes the list.
 
 The label is the session's real name: the one you set with `/rename`, or the one
 the agent generated, or your first message — in that order.
@@ -88,10 +89,10 @@ Inside the VS Code integrated terminal the session opens in an external
 terminal: VS Code exposes no API to create a tab from the command line
 ([vscode#238786](https://github.com/microsoft/vscode/issues/238786)).
 
-With Herdr, Ctrl+Enter opens each tab in the background so the list keeps
-focus and you can keep picking. Windows Terminal has no such option — opening
-a tab there will steal focus, so you may need to switch back to the list
-window before pressing Ctrl+Enter again.
+Ctrl+Enter also marks, as a bonus, on terminals that send it as a distinct
+key combination — many don't, and it then behaves just like plain Enter with
+no way to tell the difference. Tab is the one guaranteed to work everywhere,
+since it's a single byte every terminal decodes the same way.
 
 ## nexo scan
 

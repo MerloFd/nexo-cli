@@ -28,7 +28,7 @@ In the list:
   arrows, ctrl+p/n    move
   ctrl+a              switch between every folder and the current one
   enter               open the session
-  ctrl+enter          add the session as a tab of one instance, keep browsing
+  tab                 mark the session (repeat on more), enter opens them all
   esc                 clears the search; with it empty, quits
 `;
 
@@ -145,8 +145,9 @@ async function main() {
 
   const { chosen, batch } = await pickSession(sessions);
 
-  // O lote foi aberto ao vivo, tecla a tecla, sem nenhuma linha impressa
-  // porque a tela estava em modo alternativo; o relatorio so sai agora.
+  // O lote (Tab pra marcar, Enter pra abrir tudo de uma vez) so existe depois
+  // que o seletor fecha, porque a tela estava em modo alternativo ate agora;
+  // o relatorio so sai aqui.
   for (const entry of batch) {
     entry.failures.forEach((f) => console.error(t('cli.warning', { message: f })));
     if (entry.backend) {
@@ -161,7 +162,9 @@ async function main() {
   }
 
   if (!chosen) {
-    console.log(t('cli.cancelled'));
+    // So e cancelamento de fato quando nada foi aberto; um lote bem-sucedido
+    // ja fechou o seletor por conta propria, sem precisar dessa mensagem.
+    if (batch.length === 0) console.log(t('cli.cancelled'));
     if (primeiraVez) console.log(t('cli.langHint'));
     return;
   }

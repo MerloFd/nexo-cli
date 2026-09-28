@@ -54,27 +54,33 @@ function createState(items, { viewport = 10, columns = 80, color = true, cwd = n
     query: '',
     cwd,
     scope,
-    sent: new Set(),
+    marked: new Set(),
   };
 }
 
-// Ctrl+Enter abre a sessao destacada como aba de uma unica instancia e
-// continua no seletor, em vez de fechar como o Enter normal. O item marcado
-// so serve de retorno visual - quem realmente abre o terminal e quem chama
-// esta funcao.
-function markSent(state, sessionId) {
-  const sent = new Set(state.sent);
-  sent.add(sessionId);
-  return { ...state, sent };
+// Tab so marca ou desmarca - nada abre ate o Enter. Guardar por sessionId (nao
+// por indice) faz a marca sobreviver a busca e a troca de escopo, que reduzem
+// `items` mas nunca mudam quem uma sessao e.
+function toggleMark(state, sessionId) {
+  const marked = new Set(state.marked);
+  if (marked.has(sessionId)) marked.delete(sessionId);
+  else marked.add(sessionId);
+  return { ...state, marked };
 }
 
-// Marca o item destacado como enviado e devolve a referencia original da
-// sessao para quem chamou abrir de fato. Puro: nao mexe em terminal nem
-// dispara nenhum processo, so decide QUAL item e QUE o estado passa a marcar.
-function openTab(state) {
+// Marca o item destacado e avanca pro proximo, para marcar varios em sequencia
+// sem soltar a tecla. Usado pelo Tab e pelo Ctrl+Enter (quando o terminal
+// manda essa combinacao) - os dois so marcam, nunca abrem.
+function markAndAdvance(state) {
   const current = state.items[state.index];
-  if (!current) return { state, item: null };
-  return { state: markSent(state, current.sessionId), item: current.ref };
+  if (!current) return state;
+  return move(toggleMark(state, current.sessionId), 1, { wrap: true });
+}
+
+// As sessoes marcadas vem de allItems, nao de items: uma busca que escondeu
+// o item da tela nao pode fazer a marca sumir do lote final.
+function markedRefs(state) {
+  return state.allItems.filter((item) => state.marked.has(item.sessionId)).map((item) => item.ref);
 }
 
 function syncOffset(state) {
@@ -147,7 +153,10 @@ function navigationFor(state, key) {
   }
 }
 
+// Enter so vira lote quando algo foi marcado com Tab antes. Sem marca
+// nenhuma, comporta-se exatamente como sempre: abre o item destacado e fecha.
 function selectOrNothing(state) {
+  if (state.marked.size > 0) return { state, action: 'open-batch', items: markedRefs(state) };
   if (state.items.length === 0) return { state, action: 'none' };
   return { state, action: 'select' };
 }
@@ -165,13 +174,10 @@ function applyKey(state, key = {}) {
     return selectOrNothing(state);
   }
 
-  // Tab abre a sessao destacada como aba de uma unica instancia e mantem a
-  // lista aberta - a mesma coisa que Ctrl+Enter faz quando o terminal manda
-  // essa combinacao (nem todos mandam; Tab e byte simples, decodificado igual
-  // em qualquer terminal, sem depender de sequencia de escape nenhuma).
+  // Tab so marca (ou desmarca) o item destacado e avanca - nada abre ainda.
+  // O lote inteiro so abre quando o Enter vier com alguma marca pendente.
   if (name === 'tab') {
-    const { state: next, item } = openTab(state);
-    return { state: next, action: item ? 'open-tab' : 'none', item };
+    return { state: markAndAdvance(state), action: 'move' };
   }
 
   const navigated = navigationFor(state, key);
@@ -230,7 +236,7 @@ function metaLine(item) {
 }
 
 function renderItem(state, item, selected) {
-  const marker = selected ? '> ' : state.sent.has(item.sessionId) ? '✓ ' : '  ';
+  const marker = selected ? '> ' : state.marked.has(item.sessionId) ? '✓ ' : '  ';
   const label = item.title || item.summary;
   const head = truncate(`${marker}${label}`, state.columns);
   const meta = truncate(`    ${metaLine(item)}`, state.columns);
@@ -284,12 +290,13 @@ function footer(state) {
 }
 
 // Uma linha em branco no topo (antes da caixa de busca) e outra no rodape
-// (antes dos atalhos) dao respiro entre o cabecalho/lista e as bordas -
-// sem isso o texto encostava direto no topo e nos atalhos ficavam grudados
-// na ultima linha da lista.
+// (antes dos atalhos) dao respiro entre o cabecalho/lista e as bordas - e uma
+// terceira, antes de tudo, afasta o cabecalho do topo do terminal. Sem essas
+// tres o texto encostava direto na borda de cima e os atalhos ficavam
+// grudados na ultima linha da lista.
 function render(state) {
   const { items, index, offset, viewport, columns } = state;
-  const lines = [header(state), '', ...searchBox(state), ''];
+  const lines = ['', header(state), '', ...searchBox(state), ''];
 
   if (items.length === 0) {
     lines.push(paint(state, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')), '', footer(state));
@@ -319,8 +326,9 @@ module.exports = {
   setQuery,
   toggleScope,
   inScope,
-  markSent,
-  openTab,
+  toggleMark,
+  markAndAdvance,
+  markedRefs,
   filterItems,
   normalize,
   ANSI,

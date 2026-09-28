@@ -246,41 +246,32 @@ test('cores entram quando color=true', () => {
   assert.ok(render(state).includes('\x1b['));
 });
 
-test('markSent adiciona a sessao ao conjunto enviado', () => {
-  const { createState, markSent } = require('../src/selector');
+test('toggleMark adiciona e remove a sessao do conjunto marcado', () => {
+  const { createState, toggleMark } = require('../src/selector');
   let state = createState(items(3), { viewport: 3 });
 
-  assert.strictEqual(state.sent.size, 0);
-  state = markSent(state, 'id000001');
-  assert.ok(state.sent.has('id000001'));
+  assert.strictEqual(state.marked.size, 0);
+  state = toggleMark(state, 'id000001');
+  assert.ok(state.marked.has('id000001'));
+  state = toggleMark(state, 'id000001');
+  assert.ok(!state.marked.has('id000001'), 'marcar de novo desmarca');
 });
 
-test('markSent nao afeta a selecao nem a busca', () => {
-  const { createState, markSent, applyKey } = require('../src/selector');
-  let state = createState(items(5), { viewport: 5 });
-  state = applyKey(state, { name: 'down' }).state;
-
-  const indexAntes = state.index;
-  state = markSent(state, 'id000001');
-
-  assert.strictEqual(state.index, indexAntes, 'marcar nao move o cursor');
-});
-
-test('item enviado ganha marcador visual quando nao esta selecionado', () => {
-  const { createState, markSent, render } = require('../src/selector');
+test('item marcado ganha check quando nao esta selecionado', () => {
+  const { createState, toggleMark, render } = require('../src/selector');
   let state = createState(items(3), { viewport: 3, columns: 80, color: false });
-  state = markSent(state, 'id000001');
+  state = toggleMark(state, 'id000001');
 
   const linhas = render(state).split('\n');
-  const linhaEnviada = linhas.find((l) => l.includes('resumo da sessao 1'));
+  const linhaMarcada = linhas.find((l) => l.includes('resumo da sessao 1'));
 
-  assert.ok(linhaEnviada.startsWith('✓ '), 'marca com check quem ja foi aberto');
+  assert.ok(linhaMarcada.startsWith('✓ '), 'marca com check quem foi marcado');
 });
 
-test('marcador de enviado some quando o item esta selecionado', () => {
-  const { createState, markSent, applyKey, render } = require('../src/selector');
+test('check some quando o item marcado esta selecionado', () => {
+  const { createState, toggleMark, render } = require('../src/selector');
   let state = createState(items(3), { viewport: 3, columns: 80, color: false });
-  state = markSent(state, 'id000000');
+  state = toggleMark(state, 'id000000');
 
   const linhas = render(state).split('\n');
   const atual = linhas.find((l) => l.includes('resumo da sessao 0'));
@@ -288,43 +279,70 @@ test('marcador de enviado some quando o item esta selecionado', () => {
   assert.ok(atual.startsWith('> '), 'selecao tem prioridade visual sobre o check');
 });
 
-test('Tab abre o item destacado sem fechar a lista', () => {
+test('Tab so marca e avanca - nao abre nada', () => {
   const { createState, applyKey } = require('../src/selector');
   const state = createState(items(3), { viewport: 3 });
 
   const result = applyKey(state, { name: 'tab' });
-  assert.strictEqual(result.action, 'open-tab');
-  assert.strictEqual(result.item.sessionId, 'id000000');
-  assert.ok(result.state.sent.has('id000000'));
+  assert.strictEqual(result.action, 'move', 'Tab nunca fecha nem abre sozinho');
+  assert.ok(result.state.marked.has('id000000'));
+  assert.strictEqual(result.state.index, 1, 'avanca pro proximo depois de marcar');
 });
 
-test('Tab nao move o cursor nem mexe na busca', () => {
+test('Tab marca varios em sequencia', () => {
   const { createState, applyKey } = require('../src/selector');
-  let state = createState(items(5), { viewport: 5 });
-  state = applyKey(state, { name: 'down' }).state;
+  let state = createState(items(4), { viewport: 4 });
 
-  const antes = { index: state.index, query: state.query };
-  const result = applyKey(state, { name: 'tab' });
+  state = applyKey(state, { name: 'tab' }).state;
+  state = applyKey(state, { name: 'tab' }).state;
 
-  assert.strictEqual(result.state.index, antes.index);
-  assert.strictEqual(result.state.query, antes.query);
+  assert.strictEqual(state.marked.size, 2);
+  assert.ok(state.marked.has('id000000'));
+  assert.ok(state.marked.has('id000001'));
+  assert.strictEqual(state.index, 2);
 });
 
 test('Tab em lista vazia nao quebra', () => {
   const { createState, applyKey } = require('../src/selector');
   const result = applyKey(createState([], { viewport: 3 }), { name: 'tab' });
 
-  assert.strictEqual(result.action, 'none');
-  assert.strictEqual(result.item, null);
+  assert.strictEqual(result.action, 'move');
+  assert.strictEqual(result.state.marked.size, 0);
 });
 
-test('Tab da sequencia funciona igual ao Ctrl+Enter da sequencia de escape', () => {
-  const { createState, applyKey, openTab } = require('../src/selector');
+test('Enter sem nada marcado abre so o item destacado, como sempre', () => {
+  const { createState, applyKey } = require('../src/selector');
   const state = createState(items(3), { viewport: 3 });
 
-  const viaTab = applyKey(state, { name: 'tab' });
-  const viaCtrlEnter = openTab(state);
+  const result = applyKey(state, { name: 'return' });
+  assert.strictEqual(result.action, 'select');
+});
 
-  assert.strictEqual(viaTab.item.sessionId, viaCtrlEnter.item.sessionId);
-  assert.deepStrictEqual([...viaTab.state.sent], [...viaCtrlEnter.state.sent]);
+test('Enter com marcas pendentes vira lote, ignorando o item so destacado', () => {
+  const { createState, applyKey, move } = require('../src/selector');
+  let state = createState(items(4), { viewport: 4 });
+
+  state = applyKey(state, { name: 'tab' }).state; // marca 0, vai pro 1
+  state = applyKey(state, { name: 'tab' }).state; // marca 1, vai pro 2
+  state = move(state, 1); // destaca 3, sem marcar
+
+  const result = applyKey(state, { name: 'return' });
+  assert.strictEqual(result.action, 'open-batch');
+  assert.strictEqual(result.items.length, 2, 'so os marcados entram no lote');
+  assert.deepStrictEqual(
+    result.items.map((i) => i.sessionId).sort(),
+    ['id000000', 'id000001']
+  );
+});
+
+test('marca sobrevive a busca que esconde o item da tela', () => {
+  const { createState, applyKey, setQuery } = require('../src/selector');
+  let state = createState(items(4), { viewport: 4 });
+
+  state = applyKey(state, { name: 'tab' }).state; // marca item 0
+  state = setQuery(state, 'sessao 3'); // filtro esconde o item 0
+
+  const result = applyKey(state, { name: 'return' });
+  assert.strictEqual(result.action, 'open-batch');
+  assert.strictEqual(result.items[0].sessionId, 'id000000', 'a marca nao se perde com o filtro');
 });

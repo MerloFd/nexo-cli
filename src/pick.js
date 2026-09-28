@@ -1,7 +1,7 @@
 const readline = require('readline');
 const { PassThrough } = require('stream');
 const { daysAgo } = require('./scanSessions');
-const { createState, applyKey, render, syncOffset, openTab } = require('./selector');
+const { createState, applyKey, render, syncOffset, markAndAdvance } = require('./selector');
 const { extractCtrlEnter } = require('./ctrlEnter');
 const { openSession } = require('./backends');
 
@@ -27,19 +27,17 @@ function toRows(sessions) {
   }));
 }
 
-// cabecalho + linha em branco + caixa de busca (3) + indicadores de rolagem
-// (2) + linha em branco + rodape = 10 linhas fixas fora da lista
+// linha em branco + cabecalho + linha em branco + caixa de busca (3) +
+// indicadores de rolagem (2) + linha em branco + rodape = 11 linhas fixas
+// fora da lista
 function viewportFor(rows) {
-  return Math.max(1, Math.floor(((rows || 24) - 10) / 2));
+  return Math.max(1, Math.floor(((rows || 24) - 11) / 2));
 }
 
-// Ctrl+Enter abre a sessao destacada sem fechar o seletor, para juntar varias
-// numa unica instancia. A abertura acontece na hora, nao no final: se o
-// usuario sair sem dar Enter em mais nada, o que ja foi enviado continua
-// aberto.
+// Abre uma sessao marcada como parte do lote final, disparado pelo Enter.
 function openInBatch(session) {
   try {
-    const { backend, failures } = openSession(session, undefined, { background: true });
+    const { backend, failures } = openSession(session);
     return { session, backend, failures };
   } catch (err) {
     return { session, backend: null, failures: [err.message] };
@@ -70,7 +68,10 @@ function pickInteractive(sessions) {
     function onRawData(chunk) {
       const found = extractCtrlEnter(chunk.toString('latin1'), carry);
       carry = found.carry;
-      for (let i = 0; i < found.hits; i++) openHighlighted();
+      for (let i = 0; i < found.hits; i++) {
+        state = markAndAdvance(state);
+        draw();
+      }
       if (found.remainder) decoded.write(Buffer.from(found.remainder, 'latin1'));
     }
 
@@ -101,28 +102,15 @@ function pickInteractive(sessions) {
       resolve({ chosen: result, batch });
     };
 
-    // Tab (via applyKey, teclado normal) e Ctrl+Enter (via bytes crus, quando
-    // o terminal manda essa sequencia) caem aqui: mesma acao, dois gatilhos.
-    // Tab e o caminho garantido - todo terminal decodifica um byte simples
-    // igual; Ctrl+Enter e bonus para quem tiver a sequencia de escape.
-    function openHighlighted() {
-      const { state: next, item } = openTab(state);
-      state = next;
-      if (!item) return;
-
-      batch.push(openInBatch(item));
-      draw();
-    }
-
     function onKeypress(_str, key) {
-      const { state: next, action, item } = applyKey(state, key || {});
+      const { state: next, action, items } = applyKey(state, key || {});
       state = next;
 
       if (action === 'cancel') return finish(null);
       if (action === 'select') return finish(state.items[state.index].ref);
-      if (action === 'open-tab') {
-        batch.push(openInBatch(item));
-        return draw();
+      if (action === 'open-batch') {
+        for (const session of items) batch.push(openInBatch(session));
+        return finish(null);
       }
       if (action === 'move') draw();
     }
