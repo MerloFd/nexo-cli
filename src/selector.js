@@ -58,7 +58,7 @@ function createState(items, { viewport = 10, columns = 80, color = true, cwd = n
     scope,
     marked: new Set(),
     agentFilter: null,
-    previewOn: false,
+    previewOn: true,
   };
 }
 
@@ -264,6 +264,7 @@ function formatTurns(turns) {
 function metaLine(item) {
   return [
     item.agent,
+    item.dir,
     formatTurns(item.turns),
     item.age,
     item.branch,
@@ -298,6 +299,7 @@ function renderColoredMeta(state, item, selected) {
   const corBase = selected ? ANSI.white : ANSI.dim;
   const segmentos = [
     { texto: item.agent, cor: corBase },
+    { texto: item.dir, cor: corBase },
     { texto: formatTurns(item.turns), cor: corBase },
     { texto: item.age, cor: ageColor(item.mtime) },
     { texto: item.branch, cor: corBase },
@@ -309,16 +311,13 @@ function renderColoredMeta(state, item, selected) {
   return `    ${segmentos.map((s) => paint(state, s.cor, s.texto)).join(separador)}`;
 }
 
-// "titulo | path" na mesma linha, sempre na mesma cor um do outro - o path e
-// parte do nome da sessao, nao um dado secundario apagado. Trunca a partir
-// da direita, entao quando nao cabe e o path que corta primeiro, nunca o
-// titulo - e o titulo que ajuda a reconhecer a sessao de relance.
+// O path saiu do titulo e foi pra linha de metadados, logo depois do agente -
+// "claude · C:\DEV\App · ..." em vez de disputar espaco com o nome da sessao
+// na primeira linha.
 function renderItem(state, item, selected) {
   const marker = selected ? '> ' : state.marked.has(item.sessionId) ? '✓ ' : '  ';
   const label = item.title || item.summary;
-  const headPlano = `${marker}${label}  |  ${item.dir}`;
-  const cabeHead = headPlano.length <= state.columns;
-  const headTexto = cabeHead ? headPlano : truncate(headPlano, state.columns);
+  const headTexto = truncate(`${marker}${label}`, state.columns);
 
   const head = selected ? paint(state, ANSI.bold + ANSI.cyan, headTexto) : headTexto;
 
@@ -367,9 +366,8 @@ function searchBox(state) {
 }
 
 function footer(state) {
-  const dica = state.query
-    ? t('ui.footer.searching')
-    : t('ui.footer.idle');
+  const previewHint = t(state.previewOn ? 'ui.footer.previewOn' : 'ui.footer.previewOff');
+  const dica = t(state.query ? 'ui.footer.searching' : 'ui.footer.idle', { previewHint });
   return paint(state, ANSI.dim, truncate(`  ${dica}`, state.columns));
 }
 

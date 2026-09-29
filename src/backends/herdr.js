@@ -28,6 +28,18 @@ function open(session, command, { background = false } = {}) {
   const paneId = parsed && parsed.result && parsed.result.root_pane && parsed.result.root_pane.pane_id;
   if (!paneId) throw new Error('herdr nao retornou pane_id');
 
+  // Sem isso a aba fica com o rotulo generico do herdr ate o agente terminar
+  // de carregar e escrever seu proprio titulo via OSC - com --no-focus (abrir
+  // varias de uma vez) isso demora ainda mais por rodar em segundo plano.
+  const label = session.title || session.summary;
+  if (label) {
+    try {
+      execFileSync('herdr', ['pane', 'rename', paneId, label], { stdio: 'ignore' });
+    } catch {
+      // Rotulo e cosmetico - falhar aqui nao pode impedir a sessao de abrir.
+    }
+  }
+
   const [kind, ...resumeArgs] = command;
   const agentName = `sw${Date.now().toString().slice(-6)}`;
 

@@ -42,10 +42,10 @@ nexo --help         help
   │ ⌕ Search…                                          │
   └────────────────────────────────────────────────────┘
 
-> Session switcher tool  |  C:\DEV\nexo-cli
-    claude · now · HEAD · 3.5MB · 323k ctx
-  FIX RECURRENCES  |  C:\DEV\SistemasAtuais\SO5
-    codex · 2d ago · frete-refactor · 18.6MB · 3.7M used
+> Session switcher tool
+    claude · C:\DEV\nexo-cli · now · HEAD · 3.5MB · 323k ctx
+  FIX RECURRENCES
+    codex · C:\DEV\SistemasAtuais\SO5 · 2d ago · frete-refactor · 18.6MB · 3.7M used
 ```
 
 Type anything and the search starts — no prefix. It ignores accents and case,
@@ -67,15 +67,15 @@ The label is the session's real name: the one you set with `/rename`, or the one
 the agent generated, or your first message — in that order.
 
 **Ctrl+←/→** cycles a filter tab — every agent that has a session, plus "all" —
-shown above the list once more than one agent is present. **Ctrl+T** toggles a
-side-by-side preview of the highlighted session's conversation, when the
-terminal is at least 116 columns wide:
+shown above the list once more than one agent is present. A side-by-side
+preview of the highlighted session's conversation is on by default whenever
+the terminal is at least 116 columns wide; **Ctrl+T** toggles it off:
 
 ```
 > Fits (Melhorias)                                    │ claude · Fits (Melhorias)
-    claude · 1221 turns · 1h ago · HEAD · 4.8MB        │ C:\DEV\SistemasAtuais\SO5 · 1h ago
+    claude · C:\DEV\SO5 · 1221 turns · 1h ago · HEAD   │ C:\DEV\SistemasAtuais\SO5 · 1h ago
   FIX GERENCIADOR CARDS COM SPEC                       │
-    claude · 542 turns · 1h ago · HEAD · 2.9MB         │ > eu tenho o spec-kit instalado...
+    claude · C:\DEV\SO5 · 542 turns · 1h ago · HEAD    │ > eu tenho o spec-kit instalado...
                                                         │   Achado. specify-cli tá instalado...
 ```
 
@@ -99,7 +99,7 @@ From the most capable option to the least:
 
 | Environment | Result |
 | --- | --- |
-| Herdr | new tab |
+| Herdr | new tab, labeled with the session's title |
 | WezTerm | new tab |
 | kitty | new tab (needs `allow_remote_control yes` in kitty.conf) |
 | iTerm2 | new tab |

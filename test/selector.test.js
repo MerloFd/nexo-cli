@@ -187,6 +187,7 @@ test('cada sessao ocupa duas linhas: rotulo em cima, metadados embaixo', () => {
   assert.ok(head.startsWith('> '), 'a primeira linha traz o marcador e o rotulo');
   assert.deepStrictEqual(meta.trim().split(' \u00b7 '), [
     'claude',
+    'C:\\DEV',
     '2d atras',
     'master',
     '1.6MB',
@@ -199,7 +200,7 @@ test('metadados ausentes somem em vez de virar campo vazio', () => {
   const out = render(createState(magro, { viewport: 1, columns: 80, color: false }));
   const meta = out.split('\n').find((l) => l.includes('codex'));
 
-  assert.strictEqual(meta.trim(), 'codex \u00b7 agora');
+  assert.strictEqual(meta.trim(), 'codex \u00b7 C:\\DEV \u00b7 agora');
 });
 
 test('tokens de contexto e acumulados nao se confundem', () => {
@@ -410,14 +411,14 @@ test('sem mtime, a idade usa o dim padrao em vez de quebrar', () => {
 
 const { previewActive, visibleLength, PREVIEW_BREAKPOINT } = require('../src/selector');
 
-test('preview so ativa com Ctrl+T ligado E largura suficiente', () => {
+test('preview vem ligado por padrao, mas so ativa com largura suficiente', () => {
   const state = createState(items(3), { viewport: 3, columns: PREVIEW_BREAKPOINT });
-  assert.strictEqual(previewActive(state), false, 'comeca desligado por padrao');
+  assert.strictEqual(previewActive(state), true, 'comeca ligado por padrao');
 
-  const ligado = applyKey(state, { name: 't', ctrl: true }).state;
-  assert.strictEqual(previewActive(ligado), true);
+  const desligado = applyKey(state, { name: 't', ctrl: true }).state;
+  assert.strictEqual(previewActive(desligado), false);
 
-  const estreito = { ...ligado, columns: PREVIEW_BREAKPOINT - 1 };
+  const estreito = { ...state, columns: PREVIEW_BREAKPOINT - 1 };
   assert.strictEqual(previewActive(estreito), false, 'sem largura suficiente, nao mostra mesmo ligado');
 });
 
@@ -439,47 +440,44 @@ test('visibleLength ignora codigo ANSI ao contar', () => {
 });
 
 test('painel de preview mostra "carregando" quando previewLines e undefined', () => {
-  let state = createState(items(3), { viewport: 3, columns: 130, color: false });
-  state = applyKey(state, { name: 't', ctrl: true }).state;
+  const state = createState(items(3), { viewport: 3, columns: 130, color: false });
 
   const out = render(state, undefined);
   assert.ok(out.includes('Loading preview'));
 });
 
 test('painel mostra aviso quando o agente nao tem previa (null)', () => {
-  let state = createState(items(3), { viewport: 3, columns: 130, color: false });
-  state = applyKey(state, { name: 't', ctrl: true }).state;
+  const state = createState(items(3), { viewport: 3, columns: 130, color: false });
 
   const out = render(state, null);
   assert.ok(out.includes('No preview for this agent'));
 });
 
 test('painel mostra o conteudo quando previewLines chega preenchido', () => {
-  let state = createState(items(3), { viewport: 3, columns: 130, color: false });
-  state = applyKey(state, { name: 't', ctrl: true }).state;
+  const state = createState(items(3), { viewport: 3, columns: 130, color: false });
 
   const out = render(state, ['> pergunta do usuario', '  resposta do agente']);
   assert.ok(out.includes('pergunta do usuario'));
   assert.ok(out.includes('resposta do agente'));
 });
 
-test('sem Ctrl+T, o conteudo da previa nao aparece mesmo se fornecido', () => {
-  const state = createState(items(3), { viewport: 3, columns: 130, color: false });
+test('com Ctrl+T desligado, o conteudo da previa nao aparece mesmo se fornecido', () => {
+  let state = createState(items(3), { viewport: 3, columns: 130, color: false });
+  state = applyKey(state, { name: 't', ctrl: true }).state;
+
   const out = render(state, ['isso nao deveria aparecer']);
   assert.ok(!out.includes('isso nao deveria aparecer'));
 });
 
-test('terminal estreito nao mostra previa mesmo com Ctrl+T ligado', () => {
-  let state = createState(items(3), { viewport: 3, columns: 80, color: false });
-  state = applyKey(state, { name: 't', ctrl: true }).state;
+test('terminal estreito nao mostra previa mesmo com preview ligado por padrao', () => {
+  const state = createState(items(3), { viewport: 3, columns: 80, color: false });
 
   const out = render(state, ['conteudo que nao cabe']);
   assert.ok(!out.includes('conteudo que nao cabe'));
 });
 
 test('previa muito longa nao estica o quadro além da lista', () => {
-  let state = createState(items(3), { viewport: 3, columns: 130, color: false });
-  state = applyKey(state, { name: 't', ctrl: true }).state;
+  const state = createState(items(3), { viewport: 3, columns: 130, color: false });
 
   const previaEnorme = Array.from({ length: 50 }, (_, i) => `linha ${i}`);
   const linhasSemPreview = render(state, undefined).split('\n').length;
@@ -489,8 +487,7 @@ test('previa muito longa nao estica o quadro além da lista', () => {
 });
 
 test('linha de preview mais larga que a coluna e cortada, nao estoura', () => {
-  let state = createState(items(3), { viewport: 3, columns: PREVIEW_BREAKPOINT, color: false });
-  state = applyKey(state, { name: 't', ctrl: true }).state;
+  const state = createState(items(3), { viewport: 3, columns: PREVIEW_BREAKPOINT, color: false });
 
   const linhaEnorme = 'x'.repeat(500);
   const out = render(state, [linhaEnorme]);
@@ -504,8 +501,7 @@ test('o divisor do painel fica na mesma coluna em toda linha, mesmo com cores va
     { dir: 'C:\DEV', sessionId: 'id2', agent: 'codex', age: '3d atras', mtime: Date.now() - 3 * 86400000, tokens: 500000, tokensKind: 'cumulative', summary: 'b' },
   ];
 
-  let state = createState(variados, { viewport: 5, columns: 130, color: true });
-  state = applyKey(state, { name: 't', ctrl: true }).state;
+  const state = createState(variados, { viewport: 5, columns: 130, color: true });
 
   const out = render(state, ['linha da previa']);
   const posicoes = out
@@ -533,8 +529,7 @@ test('titulo comprido demais para a coluna esquerda e cortado, nao estoura o div
     },
   ];
 
-  let state = createState(longo, { viewport: 3, columns: 130, color: false });
-  state = applyKey(state, { name: 't', ctrl: true }).state;
+  const state = createState(longo, { viewport: 3, columns: 130, color: false });
 
   const out = render(state, null);
   const corpo = out.split('\n').filter((l) => l.includes('│') && !l.includes('⌕'));
@@ -562,7 +557,6 @@ test('titulo comprido colorido nao vaza cor pro lado do preview', () => {
   ];
 
   let state = createState(longo, { viewport: 3, columns: 130, color: true });
-  state = applyKey(state, { name: 't', ctrl: true }).state;
   state = applyKey(state, { name: 'down' }).state; // desmarca como selecionado, usa a cor do meta
 
   const out = render(state, ['previa']);
@@ -573,13 +567,17 @@ test('titulo comprido colorido nao vaza cor pro lado do preview', () => {
   assert.ok(linhaMeta.includes('\x1b[0m'), 'a linha cortada fecha a cor com reset');
 });
 
-test('mostra "titulo | path" na primeira linha', () => {
+test('mostra so o titulo na primeira linha, o path vai para a linha de metadados', () => {
   const state = createState(items(1), { viewport: 1, columns: 90, color: false });
   const out = render(state);
+  const linhas = out.split('\n');
 
-  assert.ok(out.includes('resumo da sessao 0'));
-  assert.ok(out.includes('|'));
-  assert.ok(out.includes('C:\\DEV\\proj0'));
+  const head = linhas.find((l) => l.includes('resumo da sessao 0'));
+  assert.ok(head, 'titulo aparece na primeira linha');
+  assert.ok(!head.includes('|'), 'path nao fica mais junto do titulo');
+
+  const meta = linhas.find((l) => l.includes('claude') || l.includes('codex'));
+  assert.ok(meta.includes('C:\\DEV\\proj0'), 'path aparece na linha de metadados');
 });
 
 test('quando nao cabe, o path corta antes do titulo, nunca o contrario', () => {
@@ -597,15 +595,6 @@ test('quando nao cabe, o path corta antes do titulo, nunca o contrario', () => {
 
   assert.ok(head.includes('Titulo curto'), 'titulo inteiro sobrevive ao corte');
   assert.ok(head.length <= 40, `linha excede a largura: ${head.length}`);
-});
-
-test('path usa a mesma cor do titulo quando o item nao esta selecionado (nenhuma)', () => {
-  const dados = items(2);
-  const state = createState(dados, { viewport: 2, columns: 90, color: true });
-  const linhas = render(state).split('\n');
-
-  const naoSelecionada = linhas.find((l) => l.includes('proj1'));
-  assert.ok(!naoSelecionada.includes('\x1b['), 'sem selecao, titulo e path ficam sem cor propria, iguais entre si');
 });
 
 test('na linha selecionada, titulo e path saem no mesmo bloco de cor', () => {
