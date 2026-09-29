@@ -44,16 +44,17 @@ nexo --help         help
 
   ┌──────────────────────────────────────────────────────────────┐
   │> Session switcher tool                                        │
-  │    ✳ claude · C:\DEV\nexo-cli · now  · HEAD · 3.5MB · 323k ctx│
+  │    claude · C:\DEV\nexo-cli · now  · HEAD · 3.5MB · 323k ctx  │
   │  FIX RECURRENCES                                              │
-  │    ⬡ codex  · C:\DEV\SO5      · 2d ago · frete-refactor       │
+  │    codex  · C:\DEV\SO5      · 2d ago · frete-refactor         │
   └──────────────────────────────────────────────────────────────┘
 ```
 
-Each agent gets its own icon and color (✳ magenta for Claude, ⬡ blue for
-Codex) so a mixed list stays scannable at a glance. Columns line up like a
-table across the sessions currently on screen — directory capped at 36 chars,
-everything else padded to the widest value on that page.
+Each agent's name is colored with that agent's own brand color (terracotta
+for Claude, green for Codex/OpenAI) so a mixed list stays scannable at a
+glance. Columns line up like a table across the sessions currently on
+screen — directory capped at 36 chars, everything else padded to the widest
+value on that page.
 
 Type anything and the search starts — no prefix. It ignores accents and case,
 treats several terms as AND, and looks at agent, branch, title, directory and

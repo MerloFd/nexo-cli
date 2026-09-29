@@ -9,8 +9,6 @@ const ANSI = {
   yellow: '\x1b[33m',
   green: '\x1b[32m',
   white: '\x1b[97m',
-  magenta: '\x1b[35m',
-  blue: '\x1b[34m',
 };
 
 function normalize(text) {
@@ -263,19 +261,12 @@ function formatTurns(turns) {
   return turns == null ? null : t('meta.turns', { n: turns });
 }
 
-// Um glifo e uma cor fixa por agente deixam facil bater o olho e achar so as
-// sessoes do Claude (ou do Codex) numa lista com varios agentes misturados -
-// sem isso, o nome do agente era so mais um texto dim igual aos outros.
-// Cores fora da paleta do age (verde/ciano/amarelo/dim) de proposito - senao
-// o agente e a idade se confundiriam visualmente, cada um querendo dizer uma
-// coisa diferente com a mesma cor.
-const AGENT_ICON = { claude: '✳', codex: '⬡', opencode: '◆' };
-const AGENT_COLOR = { claude: ANSI.magenta, codex: ANSI.blue };
+// Cor fixa por agente, usando a cor real de cada marca (nao uma escolhida por
+// nos) - terracota do Claude e verde do OpenAI/Codex, ambas em truecolor pra
+// bater com a marca de verdade. Fora da paleta do age (verde/ciano/amarelo/
+// dim) de proposito, senao os dois significados se confundiriam na mesma cor.
+const AGENT_COLOR = { claude: '\x1b[38;2;217;119;87m', codex: '\x1b[38;2;16;163;127m' };
 const DIR_COLUMN_MAX = 36;
-
-function agentLabel(agent) {
-  return agent ? `${AGENT_ICON[agent] || '•'} ${agent}` : agent;
-}
 
 // Path inteiro na tabela faria a coluna variar demais de sessao pra sessao,
 // destruindo o alinhamento das colunas seguintes - um teto fixo mantem a
@@ -303,7 +294,7 @@ function ageColor(mtimeMs) {
 // plana (cabe checar largura) quanto a colorida - sem duplicar a ordem dos
 // campos nos dois lugares.
 const COLUMNS = [
-  { key: 'agent', valor: (item) => agentLabel(item.agent), cor: (item) => AGENT_COLOR[item.agent] },
+  { key: 'agent', valor: (item) => item.agent, cor: (item) => AGENT_COLOR[item.agent] },
   { key: 'dir', valor: (item) => truncateDir(item.dir), cor: () => null },
   { key: 'turns', valor: (item) => formatTurns(item.turns), cor: () => null },
   { key: 'age', valor: (item) => item.age, cor: (item) => ageColor(item.mtime) },
@@ -359,7 +350,7 @@ function renderColoredMeta(state, item, selected, widths) {
 }
 
 // O path saiu do titulo e foi pra linha de metadados, logo depois do agente -
-// "✳ claude · C:\DEV\App · ..." em vez de disputar espaco com o nome da
+// "claude · C:\DEV\App · ..." em vez de disputar espaco com o nome da
 // sessao na primeira linha.
 function renderItem(state, item, selected, widths) {
   const marker = selected ? '> ' : state.marked.has(item.sessionId) ? '✓ ' : '  ';

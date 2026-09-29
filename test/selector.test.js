@@ -187,7 +187,7 @@ test('cada sessao ocupa duas linhas: rotulo em cima, metadados embaixo', () => {
 
   assert.ok(head.includes('│> '), 'a primeira linha traz o marcador e o rotulo');
   assert.deepStrictEqual(metaSemBorda.split(' \u00b7 '), [
-    '✳ claude',
+    'claude',
     'C:\\DEV',
     '2d atras',
     'master',
@@ -201,7 +201,7 @@ test('metadados ausentes somem em vez de virar campo vazio', () => {
   const out = render(createState(magro, { viewport: 1, columns: 80, color: false }));
   const meta = out.split('\n').find((l) => l.includes('codex'));
 
-  assert.ok(meta.includes('⬡ codex \u00b7 C:\\DEV \u00b7 agora'), 'so os campos preenchidos aparecem, sem buracos');
+  assert.ok(meta.includes('codex \u00b7 C:\\DEV \u00b7 agora'), 'so os campos preenchidos aparecem, sem buracos');
 });
 
 test('tokens de contexto e acumulados nao se confundem', () => {
