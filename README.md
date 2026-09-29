@@ -282,7 +282,8 @@ provider with the conversation — rotate it; `--redact` does not undo that.
 
 ## nexo usage
 
-Token overview by day (or `--week`), agent, model and project.
+An interactive dashboard when run in a terminal, a static report otherwise
+(piped, scripted, or with `--json`).
 
 ```
 Total: 8.2B tokens across 22827 turns
@@ -292,12 +293,20 @@ Total: 8.2B tokens across 22827 turns
   cache read       7.9B   97%
   cache write    201.0M    2%
 
-By model
+By day
 
-  claude-sonnet-5    7.2B  ████████████████████████
-  claude-opus-5    547.9M  █▉
-  gpt-5.5           23.5M  ▏
+> 2026-09-28      1.2B  █████████████▋
+  2026-09-29    410.9M  ████▊
+  ↓ 24 below
+
+  [↑↓] move   [Enter] drill into a day   [Tab] day/week   [Esc] quit
 ```
+
+Arrows move between days (or weeks, `Tab` switches), scrolling exactly like
+the session list when there are more than fit on screen. **Enter** drills
+into the highlighted day: the same totals, broken down by agent, model and
+project, but scoped to just that one day. **Esc** backs out one level at a
+time, then quits.
 
 Each turn is counted against the model used on that turn, because the model
 changes mid-session. There are no money figures: on a subscription plan tokens

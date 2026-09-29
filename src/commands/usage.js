@@ -1,5 +1,6 @@
 const { collect } = require('../usage/collect');
 const { build } = require('../usage/report');
+const { runDashboard } = require('../usage/interactive');
 
 async function run(sessions, { json = false, periodo = 'dia' } = {}) {
   const samples = await collect(sessions);
@@ -20,6 +21,13 @@ async function run(sessions, { json = false, periodo = 'dia' } = {}) {
         2
       )
     );
+    return 0;
+  }
+
+  // Sem TTY (pipe, script, CI) nao ha como navegar nada - mantem a saida
+  // estatica de sempre, scriptavel como qualquer outro comando de texto.
+  if (process.stdin.isTTY && process.stdout.isTTY) {
+    await runDashboard(samples, { periodo });
     return 0;
   }
 
