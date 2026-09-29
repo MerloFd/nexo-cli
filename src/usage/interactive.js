@@ -8,10 +8,12 @@ const CURSOR_SHOW = '\x1b[?25h';
 const CLEAR = '\x1b[H\x1b[2J';
 
 // Resumo (~7 linhas) + titulo do bloco de dias (2) + espacos e rodape (3) -
-// linhas fixas fora da lista navegavel, igual ao calculo do viewport da
-// lista de sessoes em pick.js.
+// linhas fixas fora da lista navegavel. Cada linha de dia/semana ocupa DUAS
+// linhas de tela agora (a propria linha + um respiro em branco), daí o /2 -
+// sem ele o viewport calculado estoura a altura real do terminal (mesmo bug
+// corrigido em src/scan/interactive.js).
 function viewportFor(rows) {
-  return Math.max(1, (rows || 24) - 12);
+  return Math.max(1, Math.floor(((rows || 24) - 12) / 2));
 }
 
 // Mesmo loop de tela alternativa + raw mode do seletor de sessoes
@@ -66,4 +68,4 @@ function runDashboard(samples, { periodo = 'dia' } = {}) {
   });
 }
 
-module.exports = { runDashboard };
+module.exports = { runDashboard, viewportFor };

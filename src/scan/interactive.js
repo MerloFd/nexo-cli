@@ -8,9 +8,14 @@ const CURSOR_HIDE = '\x1b[?25l';
 const CURSOR_SHOW = '\x1b[?25h';
 const CLEAR = '\x1b[H\x1b[2J';
 
-// Cabecalho (3) + rodape (3) fixos fora da lista navegavel.
+// Cabecalho (3) + rodape (3) fixos fora da lista navegavel, e cada achado
+// ocupa DUAS linhas de tela (texto + meta), igual a lista de sessoes - sem
+// dividir por 2, o viewport calculado sempre estourava a altura real do
+// terminal com mais de uma duzia de achados, empurrando o cabecalho pra fora
+// da tela e dando a impressao de que as setas nao faziam nada (confirmado
+// ao vivo: com 101 achados reais, a tela so mostrava o rodape, sempre).
 function viewportFor(rows) {
-  return Math.max(1, (rows || 24) - 6);
+  return Math.max(1, Math.floor(((rows || 24) - 6) / 2));
 }
 
 // Agrupa as chaves selecionadas por arquivo - uma sessao pode ter varios
@@ -97,4 +102,4 @@ function runInteractiveScan(results) {
   });
 }
 
-module.exports = { runInteractiveScan, applyRedaction };
+module.exports = { runInteractiveScan, applyRedaction, viewportFor };

@@ -118,6 +118,7 @@ function renderRows(state, rows, grandTotal) {
     const pct = grandTotal > 0 ? `  ${`${Math.round((r.total / grandTotal) * 100)}%`.padStart(4)} of total` : '';
     const linha = `${marcador}${String(r.key).padEnd(12)}  ${human(r.total).padStart(6)}  ${barra}${pct}`.trimEnd();
     linhas.push(selecionado ? paint(state, ANSI.bold + ANSI.cyan, linha) : linha);
+    linhas.push(''); // respiro entre linhas - sem isso as barras ficavam coladas umas nas outras
   }
 
   const abaixo = rows.length - fim;

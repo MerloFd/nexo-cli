@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { applyRedaction } = require('../src/scan/interactive');
+const { applyRedaction, viewportFor } = require('../src/scan/interactive');
 const { flattenFindings } = require('../src/scanState');
 const { mask } = require('../src/scan');
 
@@ -104,4 +104,13 @@ test('applyRedaction agrupa duas selecoes do mesmo arquivo numa unica reescrita'
 
   const depois = fs.readFileSync(file, 'utf8');
   assert.ok(!depois.includes(FAKE_AWS) && !depois.includes(FAKE_AWS_2));
+});
+
+test('viewportFor divide por 2 - cada achado ocupa duas linhas de tela', () => {
+  // Bug real: sem o /2, mais de uma duzia de achados ja estourava a altura
+  // do terminal e empurrava o cabecalho pra fora, dando a impressao de que
+  // as setas nao faziam nada (a selecao se movia fora da area visivel).
+  assert.strictEqual(viewportFor(50), 22);
+  assert.strictEqual(viewportFor(24), 9);
+  assert.ok(viewportFor(50) * 2 + 6 <= 50, 'o espaço usado pela lista nunca estoura a altura do terminal');
 });
