@@ -152,6 +152,32 @@ test('caminho longo e cortado pela esquerda, preservando o fim', () => {
   saida.split('\n').forEach((l) => assert.ok(l.length < 80, `linha longa demais: ${l}`));
 });
 
+test('com grandTotal, cada linha mostra o percentual do total geral, nao so a barra relativa', () => {
+  const linhas = [
+    { key: 'dia-A', total: 30 },
+    { key: 'dia-B', total: 10 },
+  ];
+
+  // Sem grandTotal, dia-A e dia-B so dizem quem e maior entre si - com
+  // grandTotal=1000, os dois sao pequenos perto do total, mesmo dia-A tendo
+  // a barra cheia (maior valor visivel na tabela).
+  const semTotal = tabela(linhas, { titulo: 'x' }).join('\n');
+  assert.ok(!semTotal.includes('of total'));
+
+  const comTotal = tabela(linhas, { titulo: 'x', grandTotal: 1000 }).join('\n');
+  assert.ok(comTotal.includes('3% of total'), 'dia-A e so 3% do total geral, apesar da barra cheia');
+  assert.ok(comTotal.includes('1% of total'), 'dia-B e 1% do total geral');
+});
+
+test('build calcula o grandTotal certo e propaga pra todas as tabelas', async () => {
+  const amostras = [
+    { at: Date.now(), agent: 'claude', model: 'sonnet', dir: 'C:\\DEV\\A', totals: { input: 100, output: 0, cacheRead: 0, cacheWrite: 0 } },
+  ];
+
+  const saida = build(amostras);
+  assert.ok(saida.includes('100% of total'), 'unica amostra = 100% em qualquer recorte');
+});
+
 test('maiuscula da unidade de disco nao separa o mesmo projeto', () => {
   assert.strictEqual(normalizeDir('c:\\DEV\\App'), 'C:\\DEV\\App');
   assert.strictEqual(normalizeDir('C:/DEV/App'), 'C:\\DEV\\App');

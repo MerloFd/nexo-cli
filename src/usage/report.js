@@ -55,7 +55,12 @@ function agrupar(samples, chave) {
   return [...grupos.values()].map((g) => ({ ...g, total: totalOf(g.totals) }));
 }
 
-function tabela(linhas, { titulo, ordenarPorChave = false, limite = 0 } = {}) {
+// A barra sozinha so compara linhas ENTRE SI (essa barra e maior que aquela);
+// sem o percentual do total geral, nao da pra saber se um dia que "parece
+// grande" no grafico e na verdade 3% do mes inteiro ou 40% dele. grandTotal,
+// quando informado, calcula esse percentual contra o total de fora da
+// tabela (a sessao inteira, ou so o recorte de um drill-down especifico).
+function tabela(linhas, { titulo, ordenarPorChave = false, limite = 0, grandTotal = 0 } = {}) {
   if (linhas.length === 0) return [];
 
   const ordenadas = ordenarPorChave
@@ -74,7 +79,9 @@ function tabela(linhas, { titulo, ordenarPorChave = false, limite = 0 } = {}) {
   for (const linha of visiveis) {
     const rotulo = encurtar(String(linha.key), largura).padEnd(largura);
     const valor = human(linha.total).padStart(6);
-    out.push(`  ${rotulo}  ${valor}  ${bar(linha.total, max)}`);
+    const barra = bar(linha.total, max).padEnd(25);
+    const pct = grandTotal > 0 ? `  ${`${Math.round((linha.total / grandTotal) * 100)}%`.padStart(4)} of total` : '';
+    out.push(`  ${rotulo}  ${valor}  ${barra}${pct}`.trimEnd());
   }
 
   if (limite > 0 && ordenadas.length > limite) {
@@ -119,12 +126,18 @@ function build(samples, { periodo = 'dia', topProjetos = 10 } = {}) {
       ? agrupar(samples, (s) => semanaDe(s.at))
       : agrupar(samples, (s) => diaDe(s.at));
 
+  const grandTotal = totalOf(samples.reduce((acc, s) => addTotals(acc, s.totals), emptyTotals()));
+
   const linhas = [
     ...resumo(samples),
-    ...tabela(porTempo, { titulo: t(periodo === 'semana' ? 'usage.byWeek' : 'usage.byDay'), ordenarPorChave: true }),
-    ...tabela(agrupar(samples, (s) => s.agent), { titulo: t('usage.byAgent') }),
-    ...tabela(agrupar(samples, (s) => s.model), { titulo: t('usage.byModel') }),
-    ...tabela(agrupar(samples, (s) => s.dir), { titulo: t('usage.byProject'), limite: topProjetos }),
+    ...tabela(porTempo, {
+      titulo: t(periodo === 'semana' ? 'usage.byWeek' : 'usage.byDay'),
+      ordenarPorChave: true,
+      grandTotal,
+    }),
+    ...tabela(agrupar(samples, (s) => s.agent), { titulo: t('usage.byAgent'), grandTotal }),
+    ...tabela(agrupar(samples, (s) => s.model), { titulo: t('usage.byModel'), grandTotal }),
+    ...tabela(agrupar(samples, (s) => s.dir), { titulo: t('usage.byProject'), limite: topProjetos, grandTotal }),
   ];
 
   const aproximados = samples.filter((s) => s.approximate).length;

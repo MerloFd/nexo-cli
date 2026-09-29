@@ -9,6 +9,7 @@ const ANSI = {
   yellow: '\x1b[33m',
   green: '\x1b[32m',
   white: '\x1b[97m',
+  red: '\x1b[31m',
 };
 
 function normalize(text) {

@@ -3,12 +3,17 @@
 // transforma estado em texto. O loop de teclado de verdade fica em
 // src/usage/interactive.js.
 const { agrupar, tabela, resumo, human, bar, diaDe, semanaDe } = require('./usage/report');
+const { emptyTotals, addTotals, totalOf } = require('./usage/collect');
 const { ANSI } = require('./selector');
 const { t } = require('./i18n');
 
 function rowsFor(samples, periodo) {
   const porChave = periodo === 'semana' ? semanaDe : diaDe;
   return agrupar(samples, (s) => porChave(s.at)).sort((a, b) => String(a.key).localeCompare(String(b.key)));
+}
+
+function grandTotalOf(samples) {
+  return totalOf(samples.reduce((acc, s) => addTotals(acc, s.totals), emptyTotals()));
 }
 
 function createState(samples, { periodo = 'dia', columns = 80, color = true, viewport = 10 } = {}) {
@@ -92,10 +97,12 @@ function paint(state, code, text) {
 }
 
 // Cada linha do dia/semana vira uma barra navegavel, igual a lista principal:
-// "> " (destacado, colorido) ou dois espacos, rotulo, total humanizado e a
-// barra proporcional que o relatorio estatico ja desenhava. So a fatia
-// dentro do viewport entra na tela - o resto vira indicador de rolagem.
-function renderRows(state, rows) {
+// "> " (destacado, colorido) ou dois espacos, rotulo, total humanizado, a
+// barra proporcional (comparando linhas ENTRE SI) e o percentual do total
+// geral (comparando contra o TODO - sem isso, uma barra cheia so dizia "esse
+// dia foi o maior", nunca "esse dia foi 8% do mes"). So a fatia dentro do
+// viewport entra na tela - o resto vira indicador de rolagem.
+function renderRows(state, rows, grandTotal) {
   const { offset, viewport } = state;
   const max = Math.max(1, ...rows.map((r) => r.total));
   const fim = Math.min(offset + viewport, rows.length);
@@ -107,7 +114,9 @@ function renderRows(state, rows) {
     const r = rows[i];
     const selecionado = i === state.index;
     const marcador = selecionado ? '> ' : '  ';
-    const linha = `${marcador}${String(r.key).padEnd(12)}  ${human(r.total).padStart(6)}  ${bar(r.total, max)}`;
+    const barra = bar(r.total, max).padEnd(25);
+    const pct = grandTotal > 0 ? `  ${`${Math.round((r.total / grandTotal) * 100)}%`.padStart(4)} of total` : '';
+    const linha = `${marcador}${String(r.key).padEnd(12)}  ${human(r.total).padStart(6)}  ${barra}${pct}`.trimEnd();
     linhas.push(selecionado ? paint(state, ANSI.bold + ANSI.cyan, linha) : linha);
   }
 
@@ -121,14 +130,15 @@ function renderDrill(state) {
   const { samples, periodo, drillKey } = state;
   const porChave = periodo === 'semana' ? semanaDe : diaDe;
   const escopo = samples.filter((s) => porChave(s.at) === drillKey);
+  const grandTotal = grandTotalOf(escopo);
 
   const linhas = [
     paint(state, ANSI.bold, `  ${drillKey}`),
     '',
     ...resumo(escopo),
-    ...tabela(agrupar(escopo, (s) => s.agent), { titulo: t('usage.byAgent') }),
-    ...tabela(agrupar(escopo, (s) => s.model), { titulo: t('usage.byModel') }),
-    ...tabela(agrupar(escopo, (s) => s.dir), { titulo: t('usage.byProject'), limite: 10 }),
+    ...tabela(agrupar(escopo, (s) => s.agent), { titulo: t('usage.byAgent'), grandTotal }),
+    ...tabela(agrupar(escopo, (s) => s.model), { titulo: t('usage.byModel'), grandTotal }),
+    ...tabela(agrupar(escopo, (s) => s.dir), { titulo: t('usage.byProject'), limite: 10, grandTotal }),
     paint(state, ANSI.dim, '  [Esc] back to the full range'),
   ];
 
@@ -154,7 +164,7 @@ function renderDashboard(state) {
   if (rows.length === 0) {
     linhas.push(paint(state, ANSI.dim, `  ${t('usage.empty')}`));
   } else {
-    linhas.push(...renderRows(state, rows));
+    linhas.push(...renderRows(state, rows, grandTotalOf(samples)));
   }
 
   linhas.push('');

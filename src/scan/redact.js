@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { matchRules } = require('./index');
+const { matchRules, mask } = require('./index');
 
 // So os padroes de alta confianca entram no redact - sao os que so existem em
 // credencial de verdade (chave AWS, token do GitHub, etc). Os de media/baixa
@@ -12,10 +12,16 @@ const BLOCO_PEM_RE = /-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g;
 // verdade) fica fora do casamento. Redigir so o cabecalho deixaria a chave
 // inteira exposta logo abaixo; por isso, so para chave privada, o alvo do
 // redact e o bloco PEM inteiro, nao o valor que o scan reporta.
-function findSecretsInValue(value) {
+// "only", quando presente, restringe o redact aos achados que o usuario de
+// fato selecionou na tela interativa (chave "regra|mascara", o mesmo par que
+// agrupa achados em scan/index.js) - sem isso, mantem o comportamento de
+// sempre: todo achado de alta confianca no arquivo.
+function findSecretsInValue(value, only) {
   const secrets = [];
 
   for (const hit of matchRules(value).filter((f) => f.confidence === 'alta')) {
+    if (only && !only.has(`${hit.rule}|${mask(hit.value)}`)) continue;
+
     if (hit.rule === 'private-key') {
       for (const bloco of value.matchAll(BLOCO_PEM_RE)) secrets.push(bloco[0]);
     } else {
@@ -64,7 +70,7 @@ function isPossiblyActive(mtimeMs, now = Date.now()) {
 // independente) se ha segredo de alta confianca em algum campo de texto, e
 // reescreve so as linhas que mudaram. Linha que nao e JSON valido fica como
 // esta - nao e o que o redact resolve, e forcar o parse quebraria o arquivo.
-function redactFile(filePath) {
+function redactFile(filePath, { only = null } = {}) {
   let raw;
   try {
     raw = fs.readFileSync(filePath, 'utf8');
@@ -87,7 +93,7 @@ function redactFile(filePath) {
 
     const secrets = [];
     (function coletar(node) {
-      if (typeof node === 'string') secrets.push(...findSecretsInValue(node));
+      if (typeof node === 'string') secrets.push(...findSecretsInValue(node, only));
       else if (Array.isArray(node)) node.forEach(coletar);
       else if (node && typeof node === 'object') Object.values(node).forEach(coletar);
     })(entry);

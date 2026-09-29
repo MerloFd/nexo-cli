@@ -1,5 +1,6 @@
 const { scanSessions } = require('../scan');
 const { redactFile, isPossiblyActive } = require('../scan/redact');
+const { runInteractiveScan } = require('../scan/interactive');
 const { daysAgo } = require('../scanSessions');
 const { t } = require('../i18n');
 
@@ -167,6 +168,16 @@ function printJson(results, redacted) {
   );
 }
 
+// Tela interativa so entra quando faz sentido: terminal de verdade, nada de
+// --json (saida pra maquina) nem --redact (esse fica com o comportamento
+// direto de sempre, pra automacao/CI) - e so quando ha achado de alta
+// confianca de fato selecionavel, senao a tela abriria vazia a toa.
+function podeSerInterativo({ json, redact }, results) {
+  if (json || redact) return false;
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
+  return results.some((r) => r.agent === 'claude' && r.findings.some((f) => f.confidence === 'alta'));
+}
+
 async function run(sessions, { json = false, redact = false } = {}) {
   const comArquivo = sessions.filter((s) => s.filePath);
 
@@ -175,6 +186,14 @@ async function run(sessions, { json = false, redact = false } = {}) {
   }
 
   const results = await scanSessions(comArquivo);
+
+  if (podeSerInterativo({ json, redact }, results)) {
+    const redigido = await runInteractiveScan(results);
+    if (!redigido) return 0;
+    printRedactReport(redigido);
+    return redigido.feitas.some((f) => f.outcome.error) ? 1 : 0;
+  }
+
   const redacted = redact ? applyRedactions(results) : null;
 
   if (json) {

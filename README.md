@@ -223,8 +223,33 @@ with `NEXO_NO_CACHE=1`) if a session ever shows stale data.
 
 ## nexo scan
 
-Scans the session logs for credentials that went through the chat. Findings come
-grouped by confidence, and the value is always masked.
+Scans the session logs for credentials that went through the chat. The value
+is always masked — the report never shows what it found, only that it found
+something and where.
+
+An interactive table when run in a terminal, colored by confidence, with the
+high-confidence findings selectable:
+
+```
+  nexo scan (0 selected)
+
+> ALTA   AWS access key                AKI********QQ
+      claude · Templates for EN · linha 1292
+  ALTA   Token do GitHub               ghp********ZZ  (4x)
+      claude · FIX RECURRENCES · linha 8885
+
+  ↑↓ move   tab mark (high-confidence only)   enter redact   esc quit
+```
+
+**Tab** marks a finding (only high-confidence, Claude sessions — the same
+ones `--redact` targets), **Enter** asks for confirmation and shows exactly
+how many credentials are about to be rewritten, defaulting to **No**. Only
+the findings you actually picked get touched — everything else in that
+session file, and every other session, is left alone. With nothing marked,
+Enter acts on the highlighted row instead.
+
+Piped, scripted, or with `--json`, the output stays the static grouped report
+of always:
 
 ```
 34 high-confidence finding(s) and 66 to review, across 22 session(s).
@@ -236,7 +261,7 @@ HIGH CONFIDENCE - this shape only exists in real credentials:
       AWS access key: AKI********GZ (56x)  line 1292
 ```
 
-Two things the report makes explicit:
+Two things the static report makes explicit:
 
 1. **Rotate the credential.** It was already sent to the provider along with the
    conversation; deleting the local file undoes nothing.
@@ -263,8 +288,10 @@ nexo scan --json || exit 1
 nexo scan --redact
 ```
 
-Removes high-confidence secrets in place, replacing the value with
-`[REDACTED]` and keeping the line valid JSON. Deliberately narrow, for now:
+Same rewrite as picking every high-confidence finding in the interactive
+table, but non-interactive and unconditional — for automation, where nothing
+is there to confirm a modal. Replaces the value in place with `[REDACTED]`,
+keeping the line valid JSON. Deliberately narrow, for now:
 
 - **Claude Code only.** Codex now stores sessions in SQLite, which needs a
   different rewrite approach that isn't built yet.
@@ -295,8 +322,8 @@ Total: 8.2B tokens across 22827 turns
 
 By day
 
-> 2026-09-28      1.2B  █████████████▋
-  2026-09-29    410.9M  ████▊
+> 2026-09-28      1.2B  █████████████▋              14% of total
+  2026-09-29    410.9M  ████▊                        5% of total
   ↓ 24 below
 
   [↑↓] move   [Enter] drill into a day   [Tab] day/week   [Esc] quit
@@ -305,8 +332,14 @@ By day
 Arrows move between days (or weeks, `Tab` switches), scrolling exactly like
 the session list when there are more than fit on screen. **Enter** drills
 into the highlighted day: the same totals, broken down by agent, model and
-project, but scoped to just that one day. **Esc** backs out one level at a
+project, but scoped to just that one day — and the percentages there are
+relative to that day, not to the whole range. **Esc** backs out one level at a
 time, then quits.
+
+The bar alone only ranks rows against each other — it can't tell you whether
+a "tall" day is 5% or 50% of everything. The percentage next to it always
+answers that against the total in scope: the full range at the top level,
+just that one day once you drill in.
 
 Each turn is counted against the model used on that turn, because the model
 changes mid-session. There are no money figures: on a subscription plan tokens

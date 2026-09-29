@@ -97,6 +97,24 @@ test('renderDashboard mostra a linha destacada e as dicas de tecla', () => {
   assert.ok(out.includes('drill into a day'));
 });
 
+test('renderDashboard mostra o percentual de cada dia em relacao ao total geral, nao so a barra relativa', () => {
+  const state = createState(SAMPLES, { periodo: 'dia', color: false, columns: 100 });
+  const out = renderDashboard(state);
+
+  // Total geral = 350 (100+50+200). 2026-09-20 soma 150 (43%), 2026-09-21 soma 200 (57%).
+  assert.ok(out.includes('43% of total'), 'da pra saber que fatia do total aquele dia representa');
+  assert.ok(out.includes('57% of total'));
+});
+
+test('renderDrill mostra o percentual em relacao ao total DAQUELE dia, nao ao total geral', () => {
+  let state = createState(SAMPLES, { periodo: 'dia', color: false, columns: 100 });
+  state = move(state, 1); // 2026-09-21, unica amostra do dia = 200
+  state = drillIn(state);
+
+  const out = renderDashboard(state);
+  assert.ok(out.includes('100% of total'), 'unico agente/modelo/projeto daquele dia = 100% do dia');
+});
+
 test('viewport curto rola a lista mas mantem resumo e rodape visiveis', () => {
   const muitosDias = Array.from({ length: 8 }, (_, i) =>
     amostra(`2026-09-${String(i + 1).padStart(2, '0')}`, 'claude', 'sonnet', 'C:\\DEV\\Alpha', 10)

@@ -5,6 +5,7 @@ const os = require('os');
 const path = require('path');
 
 const { redactFile, isPossiblyActive, findSecretsInValue, IDLE_MS } = require('../src/scan/redact');
+const { mask } = require('../src/scan');
 
 // Valores montados em runtime: formato valido de credencial, conteudo
 // inventado. Ver test/scan.test.js para o motivo - uma string com formato
@@ -24,6 +25,23 @@ function arquivo(linhas) {
 function ler(file) {
   return fs.readFileSync(file, 'utf8');
 }
+
+test('com "only", redige so o achado selecionado e deixa o resto intacto', () => {
+  const file = arquivo([
+    JSON.stringify({
+      type: 'user',
+      message: { role: 'user', content: `chave 1: ${FAKE_AWS} e chave 2: ${FAKE_AWS_2}` },
+    }),
+  ]);
+
+  const alvo = new Set([`aws-access-key|${mask(FAKE_AWS)}`]);
+  const resultado = redactFile(file, { only: alvo });
+  assert.strictEqual(resultado.changed, 1, 'so um dos dois achados bate no filtro');
+
+  const depois = ler(file);
+  assert.ok(!depois.includes(FAKE_AWS), 'o selecionado sumiu');
+  assert.ok(depois.includes(FAKE_AWS_2), 'o nao selecionado continua no arquivo');
+});
 
 test('troca o valor de alta confianca por [REDACTED]', () => {
   const file = arquivo([
