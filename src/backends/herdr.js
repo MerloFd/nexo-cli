@@ -83,4 +83,4 @@ function open(session, command, { background = false, sendText = null } = {}) {
   child.unref();
 }
 
-module.exports = { name: 'herdr', available, open };
+module.exports = { name: 'herdr', available, open, supportsSend: true };

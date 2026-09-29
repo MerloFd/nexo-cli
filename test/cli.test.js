@@ -91,6 +91,11 @@ test('--open aceita prefixo do id', () => {
   assert.match(out, /Opening C:\\DEV\\Alpha/);
 });
 
+test('--send avisa quando o backend nao suporta, em vez de ficar quieto', () => {
+  const out = run(['--open', 'aaa11111', '--send', 'onde paramos?']);
+  assert.match(out, /--send is not supported by fallback/, 'NEXO_FORCE_FALLBACK cai no fallback, que nao manda texto');
+});
+
 test('--open com id inexistente falha', () => {
   const out = run(['--open', 'naoexiste'], { expectFail: true });
   assert.match(out, /Session not found/);

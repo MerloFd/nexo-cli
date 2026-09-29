@@ -157,6 +157,70 @@ test('tmux fica indisponivel fora de sessao tmux', () => {
   if (before !== undefined) process.env.TMUX = before;
 });
 
+test('com sendText, tmux pega o pane-id da janela nova e manda o texto depois', (t) => {
+  const cp = require('child_process');
+
+  const execFileSyncMock = t.mock.method(cp, 'execFileSync', (bin, args) => {
+    if (args[0] === 'new-window') return '%42\n';
+    throw new Error(`chamada sincrona inesperada: ${bin} ${args.join(' ')}`);
+  });
+  const spawnMock = t.mock.method(cp, 'spawn', () => ({ unref: () => {} }));
+
+  delete require.cache[require.resolve('../src/backends/sendLater')];
+  delete require.cache[require.resolve('../src/backends/tmux')];
+  const tmux = require('../src/backends/tmux');
+  tmux.open({ dir: 'C:\DEV' }, ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268'], { sendText: 'oi' });
+
+  assert.ok(
+    execFileSyncMock.mock.calls[0].arguments[1].includes('-P'),
+    'pede o pane-id de volta, senao nao da pra mirar o send-keys'
+  );
+  const [bin, args] = spawnMock.mock.calls[0].arguments;
+  assert.strictEqual(bin, process.execPath, 'a espera + o envio rodam num processo separado');
+  assert.ok(args[1].includes(JSON.stringify('%42')), 'referencia o pane certo');
+  assert.ok(args[1].includes(JSON.stringify('oi')), 'o texto vai escapado como string JS valida');
+});
+
+test('com sendText, wezterm pega o pane-id do spawn e manda como teclas (nao colar)', (t) => {
+  const cp = require('child_process');
+
+  t.mock.method(cp, 'execFileSync', (bin, args) => {
+    if (args[0] === 'cli' && args[1] === 'spawn') return '7\n';
+    throw new Error(`chamada sincrona inesperada: ${bin} ${args.join(' ')}`);
+  });
+  const spawnMock = t.mock.method(cp, 'spawn', () => ({ unref: () => {} }));
+
+  delete require.cache[require.resolve('../src/backends/sendLater')];
+  delete require.cache[require.resolve('../src/backends/wezterm')];
+  const wezterm = require('../src/backends/wezterm');
+  wezterm.open({ dir: 'C:\DEV' }, ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268'], { sendText: 'oi' });
+
+  const [, args] = spawnMock.mock.calls[0].arguments;
+  assert.ok(args[1].includes(JSON.stringify('7')), 'referencia o pane certo');
+  assert.ok(
+    args[1].includes('--no-paste'),
+    'sem isso o Enter final vira quebra de linha dentro do texto colado, nao um envio de verdade'
+  );
+});
+
+test('com sendText, kitty pega o window-id do launch e manda pro match certo', (t) => {
+  const cp = require('child_process');
+
+  t.mock.method(cp, 'execFileSync', (bin, args) => {
+    if (args[0] === '@' && args[1] === 'launch') return '3\n';
+    throw new Error(`chamada sincrona inesperada: ${bin} ${args.join(' ')}`);
+  });
+  const spawnMock = t.mock.method(cp, 'spawn', () => ({ unref: () => {} }));
+
+  delete require.cache[require.resolve('../src/backends/sendLater')];
+  delete require.cache[require.resolve('../src/backends/kitty')];
+  const kitty = require('../src/backends/kitty');
+  kitty.open({ dir: 'C:\DEV' }, ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268'], { sendText: 'oi' });
+
+  const [, args] = spawnMock.mock.calls[0].arguments;
+  assert.ok(args[1].includes(JSON.stringify('id:3')), 'mira a janela certa via --match');
+});
+
 test('console classico do Windows so entra sem Windows Terminal', () => {
   const win = require('../src/backends/windowsConsole');
   const before = { plat: process.platform, wt: process.env.WT_SESSION };

@@ -1,4 +1,5 @@
 const { execFileSync, spawn } = require('child_process');
+const { sendLater } = require('./sendLater');
 
 // KITTY_WINDOW_ID so existe dentro de uma janela do kitty de verdade. Ainda
 // assim depende de allow_remote_control estar ligado no kitty.conf do
@@ -13,7 +14,21 @@ function available() {
   }
 }
 
-function open(session, command) {
+function open(session, command, { sendText = null } = {}) {
+  if (sendText) {
+    // "kitten @ launch" imprime o id da janela nova no stdout.
+    const windowId = execFileSync(
+      'kitten',
+      ['@', 'launch', '--type=tab', '--cwd', session.dir, ...command],
+      { encoding: 'utf8' }
+    ).trim();
+
+    sendLater([
+      ['kitten', ['@', 'send-text', '--match', `id:${windowId}`, `${sendText}\r`]],
+    ]);
+    return;
+  }
+
   const child = spawn(
     'kitten',
     ['@', 'launch', '--type=tab', '--cwd', session.dir, ...command],
@@ -22,4 +37,4 @@ function open(session, command) {
   child.unref();
 }
 
-module.exports = { name: 'kitty', available, open };
+module.exports = { name: 'kitty', available, open, supportsSend: true };

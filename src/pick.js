@@ -42,10 +42,10 @@ function viewportFor(rows) {
 // Abre uma sessao marcada como parte do lote final, disparado pelo Enter.
 function openInBatch(session, opts) {
   try {
-    const { backend, failures } = openSession(session, undefined, opts);
-    return { session, backend, failures };
+    const { backend, failures, sendSupported } = openSession(session, undefined, opts);
+    return { session, backend, failures, sendRequested: Boolean(opts && opts.sendText), sendSupported };
   } catch (err) {
-    return { session, backend: null, failures: [err.message] };
+    return { session, backend: null, failures: [err.message], sendRequested: false, sendSupported: false };
   }
 }
 

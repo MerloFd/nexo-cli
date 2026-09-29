@@ -135,9 +135,15 @@ sends the text once you confirm with **S**:
 └────────────────────────────────────────────────────────┘
 ```
 
-Herdr-only for now: it needs to know when the agent has actually finished
-booting before typing into its pane, something only the Herdr backend can do
-today.
+Supported by **Herdr, tmux, WezTerm and kitty** — every backend that has its
+own way to type into a specific pane after opening it. Herdr knows exactly
+when the agent finished booting before it sends anything; the other three
+don't expose that, so they wait a fixed ~2.5s instead — a best-effort
+estimate, not a guarantee, on a slow machine the agent might not be ready
+yet. On any other backend (Windows Terminal, plain cmd/PowerShell, GNOME
+Terminal, Konsole, Xfce Terminal, iTerm2, Terminal.app), the session still
+opens normally and `nexo` tells you the text wasn't sent, instead of staying
+quiet about it.
 
 **Ctrl+←/→** cycles a filter tab — every agent that has a session, plus "all" —
 shown above the list once more than one agent is present. A side-by-side

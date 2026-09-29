@@ -25,6 +25,7 @@ const MESSAGES = {
     'cli.warning': 'warning: {message}',
     'cli.vscodeNote':
       'Note: the VS Code terminal cannot open tabs from a command, so I opened an external terminal.',
+    'cli.sendUnsupported': 'Note: --send is not supported by {backend} yet, nothing was sent.',
     'cli.notFound': 'Session not found: {id}',
     'cli.invalidOption': 'Invalid option: {value}',
     'cli.choose': '\nPick a number (Enter cancels): ',
@@ -95,6 +96,7 @@ const MESSAGES = {
     'cli.warning': 'aviso: {message}',
     'cli.vscodeNote':
       'Nota: o terminal do VS Code nao permite abrir abas por comando; abri um terminal externo.',
+    'cli.sendUnsupported': 'Nota: --send ainda nao funciona com {backend}, nada foi mandado.',
     'cli.notFound': 'Sessao nao encontrada: {id}',
     'cli.invalidOption': 'Opcao invalida: {value}',
     'cli.choose': '\nEscolha o numero (Enter cancela): ',

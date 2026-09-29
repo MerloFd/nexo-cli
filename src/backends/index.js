@@ -65,7 +65,7 @@ function openSession(session, backends = BACKENDS, opts = {}) {
 
     try {
       backend.open(session, command, opts);
-      return { backend: backend.name, command, failures };
+      return { backend: backend.name, command, failures, sendSupported: Boolean(backend.supportsSend) };
     } catch (err) {
       failures.push(`${backend.name}: ${err.message}`);
     }

@@ -58,7 +58,7 @@ function parseArgs(argv) {
 }
 
 function reportOpen(session, sendText) {
-  const { backend, failures } = openSession(session, undefined, { sendText: sendText || null });
+  const { backend, failures, sendSupported } = openSession(session, undefined, { sendText: sendText || null });
   failures.forEach((f) => console.error(t('cli.warning', { message: f })));
   console.log(
     t('cli.opening', { dir: session.dir, id: session.sessionId.slice(0, 8), backend })
@@ -68,6 +68,12 @@ function reportOpen(session, sendText) {
   // sessao sai em um terminal externo. Avisar evita parecer bug.
   if (process.env.TERM_PROGRAM === 'vscode' && backend !== 'fallback') {
     console.log(t('cli.vscodeNote'));
+  }
+
+  // Sem isso, --send num backend que nao sabe mandar texto abria a sessao
+  // normal e ficava quieto - parecendo bug em vez de limitacao conhecida.
+  if (sendText && !sendSupported) {
+    console.log(t('cli.sendUnsupported', { backend }));
   }
 }
 
@@ -162,6 +168,9 @@ async function main() {
           backend: entry.backend,
         })
       );
+    }
+    if (entry.sendRequested && !entry.sendSupported) {
+      console.log(t('cli.sendUnsupported', { backend: entry.backend }));
     }
   }
 
