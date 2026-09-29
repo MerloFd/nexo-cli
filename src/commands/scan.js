@@ -185,7 +185,12 @@ async function run(sessions, { json = false, redact = false } = {}) {
   }
 
   if (redacted) return redacted.feitas.some((f) => f.outcome.error) ? 1 : 0;
-  return results.length > 0 ? 2 : 0;
+
+  // So achado de alta confianca reprova o exit code - baixa/media confianca
+  // sao ruido/hash na maioria das vezes (ver scan.group.low.note), e fazer
+  // um pre-commit hook falhar nisso deixaria o gate barulhento demais pra
+  // ser adotado de verdade.
+  return contar(results, 'alta') > 0 ? 2 : 0;
 }
 
 module.exports = { run, printReport, printJson, redactCandidates, applyRedactions };

@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { scanFile, groupFindings, mask, matchRules } = require('../src/scan');
+const { scanFile, scanSessions, groupFindings, mask, matchRules } = require('../src/scan');
 const { isPlaceholder } = require('../src/scan/patterns');
 const { shannon, entropyFindings } = require('../src/scan/entropy');
 
@@ -160,4 +160,58 @@ test('alta confianca aparece antes do que precisa conferencia', () => {
   ]);
 
   assert.deepStrictEqual(agrupado.map((f) => f.confidence), ['alta', 'media', 'baixa']);
+});
+
+function sessaoDe(filePath) {
+  const stat = fs.statSync(filePath);
+  return { agent: 'claude', sessionId: 'id1', dir: 'C:\\DEV', filePath, mtime: stat.mtimeMs, title: null };
+}
+
+test('scanSessions nao rele um arquivo que nao mudou desde o ultimo scan', async (t) => {
+  const file = escrever([JSON.stringify({ message: { content: `chave: ${FAKE.aws}` } })]);
+  const cacheFile = path.join(os.tmpdir(), `nexo-scan-cache-${Date.now()}.json`);
+
+  const leituras = t.mock.method(fs, 'createReadStream');
+
+  const primeira = await scanSessions([sessaoDe(file)], { cacheFile });
+  assert.strictEqual(primeira[0].findings.length, 1, 'acha o segredo na primeira leitura');
+  assert.strictEqual(leituras.mock.calls.length, 1);
+
+  const segunda = await scanSessions([sessaoDe(file)], { cacheFile });
+  assert.deepStrictEqual(segunda[0].findings, primeira[0].findings, 'mesmo resultado, vindo do cache');
+  assert.strictEqual(leituras.mock.calls.length, 1, 'nao releu o arquivo - o cache resolveu sozinho');
+
+  fs.rmSync(cacheFile, { force: true });
+});
+
+test('NEXO_NO_CACHE=1 ignora o cache do scan e rele sempre', async (t) => {
+  const file = escrever([JSON.stringify({ message: { content: `chave: ${FAKE.aws}` } })]);
+  const cacheFile = path.join(os.tmpdir(), `nexo-scan-cache-${Date.now()}.json`);
+  const leituras = t.mock.method(fs, 'createReadStream');
+
+  const antes = process.env.NEXO_NO_CACHE;
+  process.env.NEXO_NO_CACHE = '1';
+
+  await scanSessions([sessaoDe(file)], { cacheFile });
+  await scanSessions([sessaoDe(file)], { cacheFile });
+  assert.strictEqual(leituras.mock.calls.length, 2, 'com NEXO_NO_CACHE, sempre rele');
+
+  if (antes === undefined) delete process.env.NEXO_NO_CACHE;
+  else process.env.NEXO_NO_CACHE = antes;
+  fs.rmSync(cacheFile, { force: true });
+});
+
+test('scanSessions tambem cacheia o "nada encontrado" - nao so os achados', async (t) => {
+  const file = escrever(['linha comum, sem segredo nenhum']);
+  const cacheFile = path.join(os.tmpdir(), `nexo-scan-cache-${Date.now()}.json`);
+  const leituras = t.mock.method(fs, 'createReadStream');
+
+  const primeira = await scanSessions([sessaoDe(file)], { cacheFile });
+  const segunda = await scanSessions([sessaoDe(file)], { cacheFile });
+
+  assert.strictEqual(primeira.length, 0);
+  assert.strictEqual(segunda.length, 0);
+  assert.strictEqual(leituras.mock.calls.length, 1, 'sessao limpa tambem entra no cache, nao so a com achado');
+
+  fs.rmSync(cacheFile, { force: true });
 });

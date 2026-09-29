@@ -1,8 +1,17 @@
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const readline = require('readline');
 
 const { RULES, isPlaceholder } = require('./patterns');
 const { entropyFindings, shannon } = require('./entropy');
+const cache = require('../cache');
+
+// Cache proprio, separado do cache da lista de sessoes (~/.nexo-cache.json)
+// - guardam formas de dado diferentes (findings de segredo vs. metadado de
+// sessao) sob a mesma chave "path|mtime|size", e misturar os dois no mesmo
+// arquivo corromperia a leitura de um pelo formato do outro.
+const SCAN_CACHE_FILE = path.join(os.homedir(), '.nexo-scan-cache.json');
 
 // O relatorio nunca carrega o segredo inteiro: mostrar o valor recriaria o
 // vazamento em log, terminal e historico de shell.
@@ -117,14 +126,32 @@ function groupFindings(findings) {
   );
 }
 
-async function scanSessions(sessions, { onProgress } = {}) {
+// Sessao encerrada nunca mais muda, e a maioria das sessoes de verdade nao
+// tem segredo nenhum - sem cache, "nexo scan" relia o arquivo inteiro toda
+// vez so pra achar zero findings de novo. Chavear por mtime+tamanho (igual
+// a lista de sessoes ja faz) evita reler o que nao mudou desde o ultimo scan.
+async function scanSessions(sessions, { onProgress, cacheFile = SCAN_CACHE_FILE } = {}) {
   const results = [];
+  const usaCache = !process.env.NEXO_NO_CACHE;
+  const cacheAtual = usaCache ? cache.load(cacheFile) : new Map();
+  const cacheNovo = new Map();
 
   for (const session of sessions) {
     if (!session.filePath) continue;
 
-    const findings = await scanFile(session.filePath);
+    let findings;
+    let key = null;
+    try {
+      const stat = fs.statSync(session.filePath);
+      key = cache.keyFor(session.filePath, stat);
+      const entry = usaCache ? cacheAtual.get(key) : null;
+      findings = entry ? entry.findings : await scanFile(session.filePath);
+    } catch {
+      findings = await scanFile(session.filePath);
+    }
+
     if (onProgress) onProgress(session);
+    if (key) cacheNovo.set(key, { findings });
     if (findings.length === 0) continue;
 
     results.push({
@@ -138,7 +165,8 @@ async function scanSessions(sessions, { onProgress } = {}) {
     });
   }
 
+  if (usaCache) cache.save(cacheNovo, cacheFile);
   return results.sort((a, b) => b.mtime - a.mtime);
 }
 
-module.exports = { scanSessions, scanFile, groupFindings, mask, matchRules };
+module.exports = { scanSessions, scanFile, groupFindings, mask, matchRules, SCAN_CACHE_FILE };

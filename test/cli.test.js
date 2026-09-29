@@ -160,6 +160,27 @@ test('scan encontra o segredo sem imprimir o valor', () => {
   assert.doesNotMatch(out, new RegExp(fakeAws), 'o valor never aparece no relatorio');
 });
 
+test('scan so falha (exit != 0) com achado de alta confianca, nao com media/baixa', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-cli-scan-media-'));
+  const proj = path.join(home, '.claude', 'projects', 'C--DEV');
+  fs.mkdirSync(proj, { recursive: true });
+
+  // "assignment" e confianca media - formato de atribuicao generico, nao um
+  // formato de credencial real. Um pre-commit hook nao devia bloquear nisso.
+  const file = path.join(proj, 'ddd44444-4444-4444-4444-444444444444.jsonl');
+  fs.writeFileSync(
+    file,
+    [
+      JSON.stringify({ cwd: 'C:\\DEV\\Delta', sessionId: 'ddd44444-4444-4444-4444-444444444444' }),
+      JSON.stringify({ type: 'user', message: { role: 'user', content: 'SECRET=xk9pQ7mz2Rt8vL3w' } }),
+    ].join('\n'),
+    'utf8'
+  );
+
+  const out = run(['scan'], { home });
+  assert.match(out, /Segredo atribuido em variavel/i);
+});
+
 test('scan --redact remove o segredo do arquivo de verdade', () => {
   const { home, file, fakeAws } = makeHomeWithSecret();
 

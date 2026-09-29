@@ -214,6 +214,7 @@ No setup required — everything below has a sane default and is optional.
 | --- | --- | --- |
 | Language | `~/.nexo-config.json` | `NEXO_LANG=pt` for a single run |
 | Session cache | `~/.nexo-cache.json` | `NEXO_NO_CACHE=1` disables it |
+| Scan cache | `~/.nexo-scan-cache.json` | `NEXO_NO_CACHE=1` disables it too |
 
 The cache is keyed by each session file's mtime and size, so it only re-reads
 what actually changed — that's what keeps the list opening in about 100ms
@@ -243,7 +244,18 @@ Two things the report makes explicit:
    by any process running as you.
 
 `nexo scan --json` returns metadata only — type, count and location. Never the
-secret itself.
+secret itself. It's cached the same way the session list is (see
+[Configuration](#configuration)): a session that hasn't changed since the last
+scan isn't re-read.
+
+**Exit code**: `0` clean, `1` a `--redact` failed on a file, `2` at least one
+high-confidence finding — medium and low confidence never fail the command,
+so a CI or pre-commit hook can gate on `nexo scan --json` without getting
+noisy false positives from a stray hash or an example password:
+
+```
+nexo scan --json || exit 1
+```
 
 ### `--redact`
 
