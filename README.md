@@ -10,8 +10,30 @@ picture — and after a weekend nobody remembers where they stopped.
 searchable list, and opens the one you pick **in a new terminal**, without
 taking down what you already have open.
 
-Supports **Claude Code** and **OpenAI Codex** today, with **opencode** as a
-best-effort adapter (see the note below the table).
+## Highlights
+
+- One list for every agent and every repository on the machine — no more
+  hopping between `/resume` and `codex resume` one project at a time.
+- Opens sessions in a **new terminal tab**, never replaces the one you're
+  typing in.
+- **Tab** marks several sessions, **Enter** reopens all of them at once.
+- **`--send`** asks each reopened session "where did we leave off?" for you,
+  after confirming — no more retyping the same question into every tab.
+- Built-in **credential scanner** (`nexo scan`) and redaction for secrets
+  that leaked into a session log.
+- **Token usage breakdown** (`nexo usage`) by day, agent, model and project.
+- Colored, table-aligned list with a live side-by-side conversation preview.
+- 11 terminal environments detected automatically (see [Where the session
+  opens](#where-the-session-opens)), Windows included — most competing tools
+  are Unix-only.
+
+## Supported agents
+
+| Agent | Status |
+| --- | --- |
+| [Claude Code](https://claude.com/claude-code) | Full support — list, search, resume, preview, `scan --redact` |
+| [Codex](https://openai.com/codex/) | List, search, resume, `scan` — no preview or `--redact` yet |
+| [opencode](https://opencode.ai) | Best-effort — built from its public schema, not verified against a real install (see [How it works](#how-it-works)) |
 
 ## Install
 
@@ -31,7 +53,25 @@ nexo <term>         open the list already filtered
 nexo scan           look for credentials leaked into the session logs
 nexo usage          token usage overview
 nexo lang [en|pt]   show or change the interface language
-nexo --help         help
+nexo --help         this help
+
+Options:
+  --list              just print the sessions, no interactive list
+  --json              JSON output (works for scan and usage too)
+  --open <id>         open that session directly (a prefix of the id is enough)
+  --send <text>       ask to send this text to every session you open (Herdr only)
+  --redact            in scan, remove high-confidence secrets (Claude only)
+  --week              in usage, group by week instead of day
+
+In the list:
+  type                searches right away, no prefix needed
+  arrows, ctrl+p/n    move
+  ctrl+a              switch between every folder and the current one
+  ctrl+←/→            cycle the agent filter tab
+  ctrl+t              toggle the side-by-side preview
+  enter               open the session
+  tab                 mark the session (repeat on more), enter opens them all
+  esc                 clears the search; with it empty, quits
 ```
 
 ### The list
@@ -123,8 +163,8 @@ cyan under a day, yellow under a week, and the usual dim beyond that.
 ### Language
 
 English by default. `nexo lang pt` switches to Portuguese, `nexo lang` shows the
-current one. The choice is saved in `~/.nexo-config.json`; `NEXO_LANG=pt`
-overrides it for a single run without touching the file.
+current one — see [Configuration](#configuration) for where the choice is saved
+and how to override it for a single run.
 
 ### Where the session opens
 
@@ -159,6 +199,20 @@ Ctrl+Enter also marks, as a bonus, on terminals that send it as a distinct
 key combination — many don't, and it then behaves just like plain Enter with
 no way to tell the difference. Tab is the one guaranteed to work everywhere,
 since it's a single byte every terminal decodes the same way.
+
+## Configuration
+
+No setup required — everything below has a sane default and is optional.
+
+| What | Where | Override |
+| --- | --- | --- |
+| Language | `~/.nexo-config.json` | `NEXO_LANG=pt` for a single run |
+| Session cache | `~/.nexo-cache.json` | `NEXO_NO_CACHE=1` disables it |
+
+The cache is keyed by each session file's mtime and size, so it only re-reads
+what actually changed — that's what keeps the list opening in about 100ms
+even with hundreds of sessions on disk. Delete `~/.nexo-cache.json` (or run
+with `NEXO_NO_CACHE=1`) if a session ever shows stale data.
 
 ## nexo scan
 
@@ -248,9 +302,9 @@ The project directory comes from the `cwd` field inside the file, never from the
 folder name: `C--DEV-SO5-SO5-Back-End` is too ambiguous to decode back.
 
 Title, branch and usage are rewritten throughout the file, so the last ones win
-— which is why only the final 64KB are read instead of the whole file. A cache
-keyed by mtime and size avoids re-reading what did not change, so the list comes
-up in about 100ms. `NEXO_NO_CACHE=1` turns it off.
+— which is why only the final 64KB are read instead of the whole file. See
+[Configuration](#configuration) for how the session cache that keeps this fast
+is controlled.
 
 ## Similar projects
 
