@@ -67,7 +67,15 @@ function resolveClaudeExe() {
 function open(session, command) {
   const [kind, ...resto] = command;
   const claudeExe = kind === 'claude' ? resolveClaudeExe() : null;
-  const comandoFinal = claudeExe ? [`& "${claudeExe}"`, ...resto] : command;
+  const script = claudeExe ? `& "${claudeExe}" ${resto.join(' ')}` : command.join(' ');
+
+  // wt.exe reparsa os argumentos depois de "new-tab" com as proprias regras,
+  // e mastiga aspas aninhadas dentro do -Command - um caminho com espaco
+  // (comum: "C:\Users\Nome Sobrenome\...") perdia as aspas no meio do
+  // caminho, e o PowerShell tentava rodar so o pedaco antes do espaco como
+  // comando (confirmado ao vivo). -EncodedCommand manda o script inteiro em
+  // base64: nada pra reinterpretar, nenhuma aspa pra perder.
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
 
   // -w e opcao global do wt.exe: precisa vir ANTES do subcomando. Depois de
   // new-tab, o parser trata "-w" e "0" como argumentos soltos do subcomando,
@@ -77,7 +85,7 @@ function open(session, command) {
     '-w', '0',
     'new-tab',
     '-d', session.dir,
-    'powershell', '-NoExit', '-Command', comandoFinal.join(' '),
+    'powershell', '-NoExit', '-EncodedCommand', encoded,
   ], { detached: true, stdio: 'ignore' });
   child.unref();
 }

@@ -26,15 +26,16 @@ function open(session, command, { background = false } = {}) {
 
   const parsed = JSON.parse(raw);
   const paneId = parsed && parsed.result && parsed.result.root_pane && parsed.result.root_pane.pane_id;
+  const tabId = parsed && parsed.result && parsed.result.tab && parsed.result.tab.tab_id;
   if (!paneId) throw new Error('herdr nao retornou pane_id');
 
-  // Sem isso a aba fica com o rotulo generico do herdr ate o agente terminar
-  // de carregar e escrever seu proprio titulo via OSC - com --no-focus (abrir
-  // varias de uma vez) isso demora ainda mais por rodar em segundo plano.
+  // O titulo visivel na aba vem do TAB, nao do pane - "pane rename" so muda
+  // um rotulo interno que nao aparece na barra de abas (confirmado ao vivo:
+  // renomear o pane nao mudava nada visualmente, so "tab rename" muda).
   const label = session.title || session.summary;
-  if (label) {
+  if (label && tabId) {
     try {
-      execFileSync('herdr', ['pane', 'rename', paneId, label], { stdio: 'ignore' });
+      execFileSync('herdr', ['tab', 'rename', tabId, label], { stdio: 'ignore' });
     } catch {
       // Rotulo e cosmetico - falhar aqui nao pode impedir a sessao de abrir.
     }

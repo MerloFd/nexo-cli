@@ -229,7 +229,8 @@ test('windows-terminal resolve o claude.exe real e pula o shim .ps1 do npm', (t)
   windowsTerminal.open({ dir: 'C:\DEV' }, ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268']);
 
   const [, args] = spawnMock.mock.calls[0].arguments;
-  const comando = args[args.length - 1];
+  assert.strictEqual(args[args.length - 2], '-EncodedCommand', 'usa -EncodedCommand pra nao perder aspas em caminho com espaco');
+  const comando = Buffer.from(args[args.length - 1], 'base64').toString('utf16le');
 
   assert.ok(
     comando.includes('C:\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe'),
@@ -252,7 +253,8 @@ test('windows-terminal cai de volta pro "claude" simples quando nao acha o exe r
   windowsTerminal.open({ dir: 'C:\DEV' }, ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268']);
 
   const [, args] = spawnMock.mock.calls[0].arguments;
-  assert.strictEqual(args[args.length - 1], 'claude -r e05d7ab3-bf50-4d3c-b408-8c0f9164f268');
+  const comando = Buffer.from(args[args.length - 1], 'base64').toString('utf16le');
+  assert.strictEqual(comando, 'claude -r e05d7ab3-bf50-4d3c-b408-8c0f9164f268');
 });
 
 test('herdr abre a aba com execFileSync mas inicia o agente em segundo plano', (t) => {
@@ -294,9 +296,9 @@ test('herdr renomeia a aba com o titulo da sessao logo apos cria-la', (t) => {
 
   const execFileSyncMock = t.mock.method(cp, 'execFileSync', (bin, args) => {
     if (args[0] === 'tab' && args[1] === 'create') {
-      return JSON.stringify({ result: { root_pane: { pane_id: 'w1:p1' } } });
+      return JSON.stringify({ result: { root_pane: { pane_id: 'w1:p1' }, tab: { tab_id: 'w1:t1' } } });
     }
-    if (args[0] === 'pane' && args[1] === 'rename') return '';
+    if (args[0] === 'tab' && args[1] === 'rename') return '';
     throw new Error(`chamada sincrona inesperada: herdr ${args.join(' ')}`);
   });
   t.mock.method(cp, 'spawn', () => ({ unref: () => {} }));
@@ -312,9 +314,9 @@ test('herdr renomeia a aba com o titulo da sessao logo apos cria-la', (t) => {
     ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268']
   );
 
-  const renameCall = execFileSyncMock.mock.calls.find((c) => c.arguments[1][0] === 'pane');
-  assert.ok(renameCall, 'chama herdr pane rename');
-  assert.deepStrictEqual(renameCall.arguments[1], ['pane', 'rename', 'w1:p1', 'BUG GRAFICO']);
+  const renameCall = execFileSyncMock.mock.calls.find((c) => c.arguments[1][0] === 'tab' && c.arguments[1][1] === 'rename');
+  assert.ok(renameCall, 'chama herdr tab rename (nao pane rename, que nao muda o titulo visivel)');
+  assert.deepStrictEqual(renameCall.arguments[1], ['tab', 'rename', 'w1:t1', 'BUG GRAFICO']);
 
   if (antes === undefined) delete process.env.HERDR_WORKSPACE_ID;
   else process.env.HERDR_WORKSPACE_ID = antes;
