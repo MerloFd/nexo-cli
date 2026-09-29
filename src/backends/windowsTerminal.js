@@ -44,7 +44,31 @@ function available() {
   }
 }
 
+// No PowerShell, "claude" resolve pro claude.ps1 do npm antes do claude.cmd
+// (script tem prioridade sobre aplicativo na resolucao de comando) - esse
+// shim carrega o profile do usuario inteiro so pra repassar pro claude.exe
+// de verdade. Achando o .exe real uma vez (via o .cmd, que ja aponta pra ele
+// em texto puro) e chamando ele direto, pula essa camada por completo.
+let cachedClaudeExe;
+
+function resolveClaudeExe() {
+  if (cachedClaudeExe !== undefined) return cachedClaudeExe;
+  try {
+    const cmdPath = execFileSync('where', ['claude.cmd'], { encoding: 'utf8' }).split(/\r?\n/)[0].trim();
+    const exe =
+      cmdPath && path.join(path.dirname(cmdPath), 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+    cachedClaudeExe = exe && fs.existsSync(exe) ? exe : null;
+  } catch {
+    cachedClaudeExe = null;
+  }
+  return cachedClaudeExe;
+}
+
 function open(session, command) {
+  const [kind, ...resto] = command;
+  const claudeExe = kind === 'claude' ? resolveClaudeExe() : null;
+  const comandoFinal = claudeExe ? [`& "${claudeExe}"`, ...resto] : command;
+
   // -w e opcao global do wt.exe: precisa vir ANTES do subcomando. Depois de
   // new-tab, o parser trata "-w" e "0" como argumentos soltos do subcomando,
   // que os interpreta como o proprio executavel a rodar - e falha tentando
@@ -53,7 +77,7 @@ function open(session, command) {
     '-w', '0',
     'new-tab',
     '-d', session.dir,
-    'powershell', '-NoExit', '-Command', command.join(' '),
+    'powershell', '-NoExit', '-Command', comandoFinal.join(' '),
   ], { detached: true, stdio: 'ignore' });
   child.unref();
 }

@@ -142,7 +142,7 @@ test('render marca a linha selecionada e respeita a largura', () => {
   const lines = render(state).split('\n');
   lines.forEach((line) => assert.ok(line.length <= 80, `linha excede 80 colunas: ${line}`));
 
-  const marked = lines.filter((l) => l.startsWith('> '));
+  const marked = lines.filter((l) => l.includes('│> '));
   assert.strictEqual(marked.length, 1);
   assert.ok(marked[0].includes('resumo da sessao 1'));
 });
@@ -183,10 +183,11 @@ test('cada sessao ocupa duas linhas: rotulo em cima, metadados embaixo', () => {
 
   const head = lines.find((l) => l.includes('BUG GRAFICO'));
   const meta = lines.find((l) => l.includes('claude'));
+  const metaSemBorda = meta.replace(/^\s*│/, '').replace(/│\s*$/, '').trim();
 
-  assert.ok(head.startsWith('> '), 'a primeira linha traz o marcador e o rotulo');
-  assert.deepStrictEqual(meta.trim().split(' \u00b7 '), [
-    'claude',
+  assert.ok(head.includes('│> '), 'a primeira linha traz o marcador e o rotulo');
+  assert.deepStrictEqual(metaSemBorda.split(' \u00b7 '), [
+    '✳ claude',
     'C:\\DEV',
     '2d atras',
     'master',
@@ -200,7 +201,7 @@ test('metadados ausentes somem em vez de virar campo vazio', () => {
   const out = render(createState(magro, { viewport: 1, columns: 80, color: false }));
   const meta = out.split('\n').find((l) => l.includes('codex'));
 
-  assert.strictEqual(meta.trim(), 'codex \u00b7 C:\\DEV \u00b7 agora');
+  assert.ok(meta.includes('⬡ codex \u00b7 C:\\DEV \u00b7 agora'), 'so os campos preenchidos aparecem, sem buracos');
 });
 
 test('tokens de contexto e acumulados nao se confundem', () => {
@@ -266,7 +267,7 @@ test('item marcado ganha check quando nao esta selecionado', () => {
   const linhas = render(state).split('\n');
   const linhaMarcada = linhas.find((l) => l.includes('resumo da sessao 1'));
 
-  assert.ok(linhaMarcada.startsWith('✓ '), 'marca com check quem foi marcado');
+  assert.ok(linhaMarcada.includes('│✓ '), 'marca com check quem foi marcado');
 });
 
 test('check some quando o item marcado esta selecionado', () => {
@@ -277,7 +278,7 @@ test('check some quando o item marcado esta selecionado', () => {
   const linhas = render(state).split('\n');
   const atual = linhas.find((l) => l.includes('resumo da sessao 0'));
 
-  assert.ok(atual.startsWith('> '), 'selecao tem prioridade visual sobre o check');
+  assert.ok(atual.includes('│> '), 'selecao tem prioridade visual sobre o check');
 });
 
 test('Tab so marca e avanca - nao abre nada', () => {

@@ -9,6 +9,8 @@ const ANSI = {
   yellow: '\x1b[33m',
   green: '\x1b[32m',
   white: '\x1b[97m',
+  magenta: '\x1b[35m',
+  blue: '\x1b[34m',
 };
 
 function normalize(text) {
@@ -261,18 +263,26 @@ function formatTurns(turns) {
   return turns == null ? null : t('meta.turns', { n: turns });
 }
 
-function metaLine(item) {
-  return [
-    item.agent,
-    item.dir,
-    formatTurns(item.turns),
-    item.age,
-    item.branch,
-    formatBytes(item.bytes),
-    formatTokens(item.tokens, item.tokensKind),
-  ]
-    .filter(Boolean)
-    .join(' · ');
+// Um glifo e uma cor fixa por agente deixam facil bater o olho e achar so as
+// sessoes do Claude (ou do Codex) numa lista com varios agentes misturados -
+// sem isso, o nome do agente era so mais um texto dim igual aos outros.
+// Cores fora da paleta do age (verde/ciano/amarelo/dim) de proposito - senao
+// o agente e a idade se confundiriam visualmente, cada um querendo dizer uma
+// coisa diferente com a mesma cor.
+const AGENT_ICON = { claude: '✳', codex: '⬡', opencode: '◆' };
+const AGENT_COLOR = { claude: ANSI.magenta, codex: ANSI.blue };
+const DIR_COLUMN_MAX = 36;
+
+function agentLabel(agent) {
+  return agent ? `${AGENT_ICON[agent] || '•'} ${agent}` : agent;
+}
+
+// Path inteiro na tabela faria a coluna variar demais de sessao pra sessao,
+// destruindo o alinhamento das colunas seguintes - um teto fixo mantem a
+// tabela estavel, ao custo de cortar caminhos muito longos.
+function truncateDir(dir) {
+  if (!dir) return dir;
+  return dir.length > DIR_COLUMN_MAX ? `${dir.slice(0, DIR_COLUMN_MAX - 1)}…` : dir;
 }
 
 // Sessao mexida ha pouco fica verde, hoje fica ciano, essa semana fica
@@ -287,44 +297,81 @@ function ageColor(mtimeMs) {
   return ANSI.dim;
 }
 
+// Cada coluna sabe extrair seu proprio valor e, quando faz sentido, sua
+// propria cor (agente e idade carregam identidade/urgencia; o resto usa o
+// tom padrao da linha). Uma unica lista de colunas alimenta tanto a versao
+// plana (cabe checar largura) quanto a colorida - sem duplicar a ordem dos
+// campos nos dois lugares.
+const COLUMNS = [
+  { key: 'agent', valor: (item) => agentLabel(item.agent), cor: (item) => AGENT_COLOR[item.agent] },
+  { key: 'dir', valor: (item) => truncateDir(item.dir), cor: () => null },
+  { key: 'turns', valor: (item) => formatTurns(item.turns), cor: () => null },
+  { key: 'age', valor: (item) => item.age, cor: (item) => ageColor(item.mtime) },
+  { key: 'branch', valor: (item) => item.branch, cor: () => null },
+  { key: 'bytes', valor: (item) => formatBytes(item.bytes), cor: () => null },
+  { key: 'tokens', valor: (item) => formatTokens(item.tokens, item.tokensKind), cor: () => null },
+];
+
+// Largura por coluna calculada na pagina visivel (nao na lista inteira) -
+// alinha as linhas que aparecem juntas na tela sem pagar o custo de escanear
+// milhares de sessoes so pra descobrir a coluna mais larga.
+function columnWidths(pageItems) {
+  const widths = {};
+  for (const col of COLUMNS) {
+    widths[col.key] = Math.max(0, ...pageItems.map((item) => (col.valor(item) || '').length));
+  }
+  return widths;
+}
+
+// So entram na tabela as colunas que alguem na pagina de fato preenche -
+// senao uma coluna vazia (ex: sem branch) viraria um buraco de espacos em
+// todas as linhas em vez de simplesmente sumir, como sempre se comportou.
+function activeColumns(widths) {
+  return COLUMNS.filter((col) => widths[col.key] > 0);
+}
+
+function metaLine(item, widths) {
+  return activeColumns(widths)
+    .map((col) => (col.valor(item) || '').padEnd(widths[col.key]))
+    .join(' · ')
+    .trimEnd();
+}
+
 // So colore por segmento quando a linha cabe inteira sem cortar - cortar uma
 // string ja colorida no meio de um codigo ANSI corrompe o restante da linha.
 // Sem espaco, cai de volta no dim uniforme de sempre.
 // Na linha selecionada, os campos que normalmente ficam apagados (dim) viram
 // branco - continuam legiveis mesmo sob o realce da selecao, em vez de somar
-// dim com o fundo/negrito da linha e ficar dificil de ler. A idade mantem a
-// propria cor (verde/ciano/amarelo/dim): ela ja carrega informacao propria,
-// nao e so um campo secundario apagado.
-function renderColoredMeta(state, item, selected) {
+// dim com o fundo/negrito da linha e ficar dificil de ler.
+function renderColoredMeta(state, item, selected, widths) {
   const corBase = selected ? ANSI.white : ANSI.dim;
-  const segmentos = [
-    { texto: item.agent, cor: corBase },
-    { texto: item.dir, cor: corBase },
-    { texto: formatTurns(item.turns), cor: corBase },
-    { texto: item.age, cor: ageColor(item.mtime) },
-    { texto: item.branch, cor: corBase },
-    { texto: formatBytes(item.bytes), cor: corBase },
-    { texto: formatTokens(item.tokens, item.tokensKind), cor: corBase },
-  ].filter((s) => s.texto);
-
+  const cols = activeColumns(widths);
   const separador = paint(state, corBase, ' · ');
-  return `    ${segmentos.map((s) => paint(state, s.cor, s.texto)).join(separador)}`;
+
+  const texto = cols
+    .map((col) => {
+      const valor = (col.valor(item) || '').padEnd(widths[col.key]);
+      return paint(state, col.cor(item) || corBase, valor);
+    })
+    .join(separador);
+
+  return `    ${texto}`;
 }
 
 // O path saiu do titulo e foi pra linha de metadados, logo depois do agente -
-// "claude · C:\DEV\App · ..." em vez de disputar espaco com o nome da sessao
-// na primeira linha.
-function renderItem(state, item, selected) {
+// "✳ claude · C:\DEV\App · ..." em vez de disputar espaco com o nome da
+// sessao na primeira linha.
+function renderItem(state, item, selected, widths) {
   const marker = selected ? '> ' : state.marked.has(item.sessionId) ? '✓ ' : '  ';
   const label = item.title || item.summary;
   const headTexto = truncate(`${marker}${label}`, state.columns);
 
   const head = selected ? paint(state, ANSI.bold + ANSI.cyan, headTexto) : headTexto;
 
-  const metaPlano = `    ${metaLine(item)}`;
+  const metaPlano = `    ${metaLine(item, widths)}`;
   const cabeMeta = metaPlano.length <= state.columns;
   const meta = cabeMeta
-    ? renderColoredMeta(state, item, selected)
+    ? renderColoredMeta(state, item, selected, widths)
     : paint(state, selected ? ANSI.white : ANSI.dim, truncate(metaPlano, state.columns));
 
   return [head, meta];
@@ -485,33 +532,60 @@ function composeSideBySide(state, leftLines, rightLines, leftWidth, rightWidth) 
   });
 }
 
+// O corpo (lista + preview) ganha uma moldura propria, separada da caixa de
+// busca - mesma conta de largura que a caixa de busca ja usa (borda inclusa
+// cabe em columns-4). Sem essa moldura, o divisor do preview ficava
+// "flutuando" sem nada delimitando onde a lista termina.
+function bodyBorder(bodyWidth, meio) {
+  const preenchido =
+    meio == null ? '─'.repeat(bodyWidth) : `${'─'.repeat(meio)}┬${'─'.repeat(bodyWidth - meio - 1)}`;
+  return { topo: `  ┌${preenchido}┐`, fundo: `  └${preenchido.replace('┬', '┴')}┘` };
+}
+
 function render(state, previewLines) {
   const { items, index, offset, viewport, columns } = state;
+  const width = Math.max(24, columns - 4); // moldura inteira (bordas inclusas), como a caixa de busca
+  const bodyWidth = width - 2; // area util dentro das bordas
+  const bodyState = { ...state, columns: bodyWidth };
   const lines = ['', header(state), '', ...searchBox(state), filterBar(state), ''];
 
   const corpo = [];
   if (items.length === 0) {
-    corpo.push(paint(state, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')));
+    corpo.push(paint(bodyState, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')));
   } else {
-    corpo.push(offset > 0 ? paint(state, ANSI.dim, '  ' + t('ui.scroll.up', { n: offset })) : '');
+    corpo.push(offset > 0 ? paint(bodyState, ANSI.dim, '  ' + t('ui.scroll.up', { n: offset })) : '');
 
     const end = Math.min(offset + viewport, items.length);
-    for (let i = offset; i < end; i++) corpo.push(...renderItem(state, items[i], i === index));
+    const widths = columnWidths(items.slice(offset, end));
+    for (let i = offset; i < end; i++) corpo.push(...renderItem(bodyState, items[i], i === index, widths));
 
     const abaixo = items.length - end;
-    corpo.push(abaixo > 0 ? paint(state, ANSI.dim, '  ' + t('ui.scroll.down', { n: abaixo })) : '');
+    corpo.push(abaixo > 0 ? paint(bodyState, ANSI.dim, '  ' + t('ui.scroll.down', { n: abaixo })) : '');
   }
 
+  let miolo = corpo;
+  let meio = null;
   if (previewActive(state) && items.length > 0) {
-    const largura = columns - 3; // 3 = " │ "
+    const largura = bodyWidth - 3; // 3 = " │ "
     const leftWidth = Math.floor(largura * PREVIEW_RATIO);
     const rightWidth = largura - leftWidth;
-    const painel = [...previewHeader(state, items[index]), ...previewBody(state, previewLines)];
+    const painel = [...previewHeader(bodyState, items[index]), ...previewBody(bodyState, previewLines)];
 
-    lines.push(...composeSideBySide(state, corpo, painel, leftWidth, rightWidth));
-  } else {
-    lines.push(...corpo);
+    miolo = composeSideBySide(bodyState, corpo, painel, leftWidth, rightWidth);
+    meio = leftWidth + 1; // posicao do divisor "│" dentro da linha, pro topo/fundo alinharem com "┬"/"┴"
   }
+
+  const borda = bodyBorder(bodyWidth, meio);
+  // O "│" de cada linha fica sem cor propria (diferente do topo/fundo, que
+  // saem inteiros em dim) - colori-lo aqui contaminaria qualquer checagem de
+  // "esse campo nao devia ter dim" na linha, ja que o pipe compartilha a
+  // mesma string do conteudo.
+  const moldura = '│';
+  lines.push(
+    paint(state, ANSI.dim, borda.topo),
+    ...miolo.map((linha) => `  ${moldura}${padVisible(bodyState, linha, bodyWidth)}${moldura}`),
+    paint(state, ANSI.dim, borda.fundo)
+  );
 
   lines.push('', footer(state));
   return lines.join('\n');

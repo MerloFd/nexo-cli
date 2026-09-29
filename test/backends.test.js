@@ -212,6 +212,49 @@ test('wt.exe recebe -w antes do subcomando new-tab', (t) => {
   );
 });
 
+test('windows-terminal resolve o claude.exe real e pula o shim .ps1 do npm', (t) => {
+  const cp = require('child_process');
+  const fs = require('fs');
+
+  t.mock.method(cp, 'execFileSync', (bin, args) => {
+    if (bin === 'where' && args[0] === 'claude.cmd') return 'C:\\npm\\claude.cmd\n';
+    throw new Error(`chamada sincrona inesperada: ${bin} ${args.join(' ')}`);
+  });
+  t.mock.method(fs, 'existsSync', () => true);
+  const spawnMock = t.mock.method(cp, 'spawn', () => ({ unref: () => {} }));
+
+  delete require.cache[require.resolve('../src/backends/windowsTerminal')];
+  const windowsTerminal = require('../src/backends/windowsTerminal');
+
+  windowsTerminal.open({ dir: 'C:\DEV' }, ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268']);
+
+  const [, args] = spawnMock.mock.calls[0].arguments;
+  const comando = args[args.length - 1];
+
+  assert.ok(
+    comando.includes('C:\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe'),
+    'chama o exe real em vez de "claude" (que resolveria pro shim .ps1)'
+  );
+  assert.ok(!comando.trimStart().startsWith('claude '), 'nao invoca mais o nome ambiguo "claude"');
+});
+
+test('windows-terminal cai de volta pro "claude" simples quando nao acha o exe real', (t) => {
+  const cp = require('child_process');
+
+  t.mock.method(cp, 'execFileSync', () => {
+    throw new Error('claude.cmd nao encontrado no PATH');
+  });
+  const spawnMock = t.mock.method(cp, 'spawn', () => ({ unref: () => {} }));
+
+  delete require.cache[require.resolve('../src/backends/windowsTerminal')];
+  const windowsTerminal = require('../src/backends/windowsTerminal');
+
+  windowsTerminal.open({ dir: 'C:\DEV' }, ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268']);
+
+  const [, args] = spawnMock.mock.calls[0].arguments;
+  assert.strictEqual(args[args.length - 1], 'claude -r e05d7ab3-bf50-4d3c-b408-8c0f9164f268');
+});
+
 test('herdr abre a aba com execFileSync mas inicia o agente em segundo plano', (t) => {
   const cp = require('child_process');
 
