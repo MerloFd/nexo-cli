@@ -291,6 +291,35 @@ test('herdr abre a aba com execFileSync mas inicia o agente em segundo plano', (
   else process.env.HERDR_WORKSPACE_ID = antes;
 });
 
+test('herdr so passa --no-focus quando aberto em segundo plano', (t) => {
+  const cp = require('child_process');
+
+  const execFileSyncMock = t.mock.method(cp, 'execFileSync', (bin, args) => {
+    if (args[0] === 'tab' && args[1] === 'create') {
+      return JSON.stringify({ result: { root_pane: { pane_id: 'w1:p1' } } });
+    }
+    throw new Error(`chamada sincrona inesperada: herdr ${args.join(' ')}`);
+  });
+  t.mock.method(cp, 'spawn', () => ({ unref: () => {} }));
+
+  const antes = process.env.HERDR_WORKSPACE_ID;
+  process.env.HERDR_WORKSPACE_ID = 'w1';
+
+  delete require.cache[require.resolve('../src/backends/herdr')];
+  const herdr = require('../src/backends/herdr');
+
+  herdr.open({ dir: 'C:\DEV' }, ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268']);
+  const semBackground = execFileSyncMock.mock.calls[0].arguments[1];
+  assert.ok(!semBackground.includes('--no-focus'), 'sem opts, a aba assume o foco');
+
+  herdr.open({ dir: 'C:\DEV' }, ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268'], { background: true });
+  const comBackground = execFileSyncMock.mock.calls[1].arguments[1];
+  assert.ok(comBackground.includes('--no-focus'), 'em segundo plano, nao rouba o foco de quem abriu antes');
+
+  if (antes === undefined) delete process.env.HERDR_WORKSPACE_ID;
+  else process.env.HERDR_WORKSPACE_ID = antes;
+});
+
 test('herdr renomeia a aba com o titulo da sessao logo apos cria-la', (t) => {
   const cp = require('child_process');
 

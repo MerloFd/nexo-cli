@@ -3,6 +3,7 @@ const assert = require('node:assert');
 
 const { toRows, viewportFor } = require('../src/pick');
 const { createState, applyKey, syncOffset } = require('../src/selector');
+const backends = require('../src/backends');
 
 test('toRows converte sessoes em linhas renderizaveis', () => {
   const rows = toRows([{ dir: 'C:\\DEV', sessionId: 'abc', mtime: Date.now(), summary: 'oi' }]);
@@ -53,4 +54,26 @@ test('resize preserva a busca digitada', () => {
 
   assert.strictEqual(after.query, '1');
   assert.strictEqual(after.items.length, filtered);
+});
+
+test('no lote, so a ultima sessao abre em primeiro plano', (t) => {
+  const chamadas = [];
+  t.mock.method(backends, 'openSession', (session, _backends, opts) => {
+    chamadas.push({ id: session.sessionId, background: Boolean(opts && opts.background) });
+    return { backend: 'fake', failures: [] };
+  });
+
+  // pick.js desestrutura openSession no momento do require - o mock so tem
+  // efeito se o modulo for recarregado depois que ele foi aplicado.
+  delete require.cache[require.resolve('../src/pick')];
+  const { openBatch } = require('../src/pick');
+
+  const items = [{ sessionId: 'a' }, { sessionId: 'b' }, { sessionId: 'c' }];
+  openBatch(items);
+
+  assert.deepStrictEqual(chamadas, [
+    { id: 'a', background: true },
+    { id: 'b', background: true },
+    { id: 'c', background: false },
+  ]);
 });

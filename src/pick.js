@@ -40,13 +40,21 @@ function viewportFor(rows) {
 }
 
 // Abre uma sessao marcada como parte do lote final, disparado pelo Enter.
-function openInBatch(session) {
+function openInBatch(session, opts) {
   try {
-    const { backend, failures } = openSession(session);
+    const { backend, failures } = openSession(session, undefined, opts);
     return { session, backend, failures };
   } catch (err) {
     return { session, backend: null, failures: [err.message] };
   }
+}
+
+// So a ultima sessao do lote fica em primeiro plano - as demais sobem em
+// segundo plano, senao cada uma rouba o foco da anterior conforme abre e o
+// usuario perde de vista a que devia ficar visivel no final.
+function openBatch(items) {
+  const last = items.length - 1;
+  return items.map((session, i) => openInBatch(session, { background: i !== last }));
 }
 
 function pickInteractive(sessions) {
@@ -142,7 +150,7 @@ function pickInteractive(sessions) {
       if (action === 'cancel') return finish(null);
       if (action === 'select') return finish(state.items[state.index].ref);
       if (action === 'open-batch') {
-        for (const session of items) batch.push(openInBatch(session));
+        batch.push(...openBatch(items));
         return finish(null);
       }
       if (action === 'move') {
@@ -192,4 +200,4 @@ function pickSession(sessions) {
   return pickNonInteractive(sessions);
 }
 
-module.exports = { pickSession, printPlainList, toRows, viewportFor };
+module.exports = { pickSession, printPlainList, toRows, viewportFor, openInBatch, openBatch };
