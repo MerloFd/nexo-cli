@@ -51,13 +51,14 @@ function openInBatch(session, opts) {
 
 // So a ultima sessao do lote fica em primeiro plano - as demais sobem em
 // segundo plano, senao cada uma rouba o foco da anterior conforme abre e o
-// usuario perde de vista a que devia ficar visivel no final.
-function openBatch(items) {
+// usuario perde de vista a que devia ficar visivel no final. sendText (com
+// --send) manda a mesma mensagem pra todas assim que cada uma ficar pronta.
+function openBatch(items, sendText) {
   const last = items.length - 1;
-  return items.map((session, i) => openInBatch(session, { background: i !== last }));
+  return items.map((session, i) => openInBatch(session, { background: i !== last, sendText: sendText || null }));
 }
 
-function pickInteractive(sessions) {
+function pickInteractive(sessions, { sendPrompt = null } = {}) {
   const rows = toRows(sessions);
   const out = process.stdout;
   const batch = [];
@@ -67,6 +68,7 @@ function pickInteractive(sessions) {
     columns: out.columns || 80,
     color: !process.env.NO_COLOR,
     cwd: process.cwd(),
+    sendPrompt,
   });
 
   return new Promise((resolve) => {
@@ -133,24 +135,24 @@ function pickInteractive(sessions) {
       draw();
     };
 
-    const finish = (result) => {
+    const finish = (result, sendText = null) => {
       process.stdin.removeListener('data', onRawData);
       decoded.removeListener('keypress', onKeypress);
       out.removeListener('resize', onResize);
       out.write(CURSOR_SHOW + ALT_SCREEN_OFF);
       if (process.stdin.isTTY) process.stdin.setRawMode(Boolean(wasRaw));
       process.stdin.pause();
-      resolve({ chosen: result, batch });
+      resolve({ chosen: result, batch, sendText });
     };
 
     function onKeypress(_str, key) {
-      const { state: next, action, items } = applyKey(state, key || {});
+      const { state: next, action, items, send } = applyKey(state, key || {});
       state = next;
 
       if (action === 'cancel') return finish(null);
-      if (action === 'select') return finish(state.items[state.index].ref);
+      if (action === 'select') return finish(state.items[state.index].ref, send ? sendPrompt : null);
       if (action === 'open-batch') {
-        batch.push(...openBatch(items));
+        batch.push(...openBatch(items, send ? sendPrompt : null));
         return finish(null);
       }
       if (action === 'move') {
@@ -195,8 +197,8 @@ function pickNonInteractive(sessions) {
   });
 }
 
-function pickSession(sessions) {
-  if (process.stdin.isTTY && process.stdout.isTTY) return pickInteractive(sessions);
+function pickSession(sessions, opts) {
+  if (process.stdin.isTTY && process.stdout.isTTY) return pickInteractive(sessions, opts);
   return pickNonInteractive(sessions);
 }
 

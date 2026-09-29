@@ -349,6 +349,95 @@ test('marca sobrevive a busca que esconde o item da tela', () => {
   assert.strictEqual(result.items[0].sessionId, 'id000000', 'a marca nao se perde com o filtro');
 });
 
+test('sem --send, Enter abre direto sem passar por modal nenhum', () => {
+  const { createState, applyKey } = require('../src/selector');
+  const state = createState(items(3), { viewport: 3 });
+
+  const result = applyKey(state, { name: 'return' });
+  assert.strictEqual(result.action, 'select');
+  assert.strictEqual(result.state.confirmSend, null);
+});
+
+test('com --send, Enter suspende em modal em vez de abrir na hora', () => {
+  const { createState, applyKey } = require('../src/selector');
+  const state = createState(items(3), { viewport: 3, sendPrompt: 'onde paramos?' });
+
+  const result = applyKey(state, { name: 'return' });
+  assert.strictEqual(result.action, 'move', 'ainda nao abre nada - so entra no modal');
+  assert.ok(result.state.confirmSend, 'modal fica pendente');
+  assert.strictEqual(result.state.confirmSend.pending.type, 'select');
+});
+
+test('no modal, S confirma o envio e finalmente libera a acao pendente', () => {
+  const { createState, applyKey } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3, sendPrompt: 'onde paramos?' });
+  state = applyKey(state, { name: 'return' }).state;
+
+  const result = applyKey(state, { sequence: 'S' });
+  assert.strictEqual(result.action, 'select');
+  assert.strictEqual(result.send, true);
+  assert.strictEqual(result.state.confirmSend, null, 'modal fecha depois de responder');
+});
+
+test('no modal, Enter (padrao) libera a acao sem mandar nada', () => {
+  const { createState, applyKey } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3, sendPrompt: 'onde paramos?' });
+  state = applyKey(state, { name: 'return' }).state;
+
+  const result = applyKey(state, { name: 'return' });
+  assert.strictEqual(result.action, 'select');
+  assert.strictEqual(result.send, false, 'padrao do modal e nao mandar');
+});
+
+test('no modal, Esc cancela e volta pra lista sem abrir nada', () => {
+  const { createState, applyKey } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3, sendPrompt: 'onde paramos?' });
+  state = applyKey(state, { name: 'return' }).state;
+
+  const result = applyKey(state, { name: 'escape' });
+  assert.strictEqual(result.action, 'move');
+  assert.strictEqual(result.state.confirmSend, null);
+});
+
+test('no modal, teclas de busca/navegacao nao vazam pra lista por baixo', () => {
+  const { createState, applyKey } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3, sendPrompt: 'onde paramos?' });
+  state = applyKey(state, { name: 'return' }).state;
+
+  const result = applyKey(state, { sequence: 'x', name: 'x' });
+  assert.strictEqual(result.action, 'none');
+  assert.strictEqual(result.state.query, '', 'nao comeca a buscar por engano');
+  assert.ok(result.state.confirmSend, 'modal continua na tela');
+});
+
+test('render mostra o modal de confirmacao em vez da lista, quando pendente', () => {
+  const { createState, applyKey, render } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3, columns: 90, sendPrompt: 'onde paramos?', color: false });
+  state = applyKey(state, { name: 'return' }).state;
+
+  const out = render(state);
+  assert.ok(out.includes('onde paramos?'), 'mostra o texto que sera mandado');
+  assert.ok(out.includes('[S] Sim'), 'mostra a opcao de confirmar');
+  assert.ok(!out.includes('Buscar'), 'a caixa de busca fica escondida atras do modal');
+});
+
+test('com --send e lote marcado, modal carrega os itens do lote, nao so o destacado', () => {
+  const { createState, applyKey } = require('../src/selector');
+  let state = createState(items(4), { viewport: 4, sendPrompt: 'onde paramos?' });
+
+  state = applyKey(state, { name: 'tab' }).state;
+  state = applyKey(state, { name: 'tab' }).state;
+  const suspenso = applyKey(state, { name: 'return' });
+
+  assert.strictEqual(suspenso.state.confirmSend.pending.type, 'open-batch');
+  assert.strictEqual(suspenso.state.confirmSend.pending.items.length, 2);
+
+  const result = applyKey(suspenso.state, { sequence: 'S' });
+  assert.strictEqual(result.action, 'open-batch');
+  assert.strictEqual(result.items.length, 2);
+  assert.strictEqual(result.send, true);
+});
+
 test('idade recente, de hoje, da semana e antiga ganham cores diferentes', () => {
   const base = { dir: 'C:\DEV', sessionId: 'id1', agent: 'claude', summary: 's' };
   const agora = Date.now();

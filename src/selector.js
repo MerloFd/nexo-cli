@@ -42,7 +42,10 @@ function inScope(items, scope, cwd) {
   return items.filter((item) => normalizeDir(item.dir).toLowerCase() === alvo);
 }
 
-function createState(items, { viewport = 10, columns = 80, color = true, cwd = null, scope = 'global' } = {}) {
+function createState(
+  items,
+  { viewport = 10, columns = 80, color = true, cwd = null, scope = 'global', sendPrompt = null } = {}
+) {
   const base = inScope(items, scope, cwd);
 
   return {
@@ -59,6 +62,8 @@ function createState(items, { viewport = 10, columns = 80, color = true, cwd = n
     marked: new Set(),
     agentFilter: null,
     previewOn: true,
+    sendPrompt,
+    confirmSend: null,
   };
 }
 
@@ -195,17 +200,41 @@ function selectOrNothing(state) {
 // A busca esta sempre ativa: qualquer caractere imprimivel vai para o termo,
 // como no /resume do Claude Code. Por isso a navegacao fica nas setas - letra
 // nenhuma pode ser atalho, ou seria impossivel buscar por ela.
+// Com --send configurado, o Enter que abriria de vez fica suspenso num
+// modal de confirmacao primeiro - nada de mandar mensagem sem perguntar.
+// Enquanto o modal esta na tela, so essas teclas existem: nada de busca,
+// navegacao ou outro atalho vaza pro que fica por baixo.
+function applyKeyDuringConfirm(state, key) {
+  const name = key.name || '';
+  const seq = key.sequence || '';
+  const { pending } = state.confirmSend;
+  const limpo = { ...state, confirmSend: null };
+
+  if (name === 'escape') return { state: limpo, action: 'move' };
+  if (seq === 's' || seq === 'S') return { state: limpo, action: pending.type, items: pending.items, send: true };
+  if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n' || seq === 'n' || seq === 'N') {
+    return { state: limpo, action: pending.type, items: pending.items, send: false };
+  }
+  return { state, action: 'none' };
+}
+
 function applyKey(state, key = {}) {
   const name = key.name || '';
   const seq = key.sequence || '';
 
   if (key.ctrl && (name === 'c' || name === 'd')) return { state, action: 'cancel' };
+  if (state.confirmSend) return applyKeyDuringConfirm(state, key);
   if (key.ctrl && name === 'a') return { state: toggleScope(state), action: 'move' };
   if (key.ctrl && name === 'right') return { state: cycleAgentFilter(state, 1), action: 'move' };
   if (key.ctrl && name === 'left') return { state: cycleAgentFilter(state, -1), action: 'move' };
   if (key.ctrl && name === 't') return { state: { ...state, previewOn: !state.previewOn }, action: 'move' };
   if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n') {
-    return selectOrNothing(state);
+    const resultado = selectOrNothing(state);
+    if (state.sendPrompt && (resultado.action === 'select' || resultado.action === 'open-batch')) {
+      const items = resultado.action === 'open-batch' ? resultado.items : [state.items[state.index].ref];
+      return { state: { ...state, confirmSend: { pending: { type: resultado.action, items } } }, action: 'move' };
+    }
+    return resultado;
   }
 
   // Tab so marca (ou desmarca) o item destacado e avanca - nada abre ainda.
@@ -533,7 +562,35 @@ function bodyBorder(bodyWidth, meio) {
   return { topo: `  ┌${preenchido}┐`, fundo: `  └${preenchido.replace('┬', '┴')}┘` };
 }
 
+// Sobrepoe a tela inteira (nada de lista, preview ou busca por baixo) pra
+// deixar claro que nenhuma outra tecla funciona ate essa pergunta ser
+// respondida - evita mandar mensagem sem querer so porque a lista continuou
+// visivel e o dedo escorregou numa tecla qualquer.
+function renderConfirmSend(state) {
+  const n = state.confirmSend.pending.items.length;
+  const alvo = n === 1 ? 'essa sessao que vai abrir' : `essas ${n} sessoes que vao abrir`;
+  const linhas = [
+    `Mandar essa mensagem pra ${alvo}?`,
+    '',
+    `"${state.sendPrompt}"`,
+    '',
+    '[Enter] Nao (padrao)    [S] Sim    [Esc] cancelar',
+  ];
+  const largura = Math.min(Math.max(...linhas.map((l) => l.length)) + 4, Math.max(20, state.columns - 4));
+  const corpo = linhas.map((l) => `  │ ${l.padEnd(largura - 2)} │`);
+
+  return [
+    '',
+    paint(state, ANSI.dim, `  ┌${'─'.repeat(largura)}┐`),
+    ...corpo,
+    paint(state, ANSI.dim, `  └${'─'.repeat(largura)}┘`),
+    '',
+  ].join('\n');
+}
+
 function render(state, previewLines) {
+  if (state.confirmSend) return renderConfirmSend(state);
+
   const { items, index, offset, viewport, columns } = state;
   const width = Math.max(24, columns - 4); // moldura inteira (bordas inclusas), como a caixa de busca
   const bodyWidth = width - 2; // area util dentro das bordas

@@ -11,7 +11,28 @@ function available() {
   }
 }
 
-function open(session, command, { background = false } = {}) {
+// Mandar o prompt exige esperar o agente ficar pronto pra digitar - e
+// "agent start" so retorna quando isso acontece (pode levar segundos). Rodar
+// essa espera + o envio dentro de um processo node proprio, destacado do
+// nexo, deixa ele bloquear a vontade: quem espera e esse processo-filho, nao
+// o nexo. Os valores dinamicos entram via JSON.stringify (escapa pra sintaxe
+// JS valida) - nunca via shell, entao nao ha risco de injecao de comando
+// mesmo com texto arbitrario do usuario em --send.
+function spawnAgentThenSend({ agentName, kind, paneId, resumeArgs, sendText }) {
+  const args = ['agent', 'start', agentName, '--kind', kind, '--pane', paneId, '--', ...resumeArgs];
+  const script = `
+    const { execFileSync } = require('child_process');
+    try {
+      execFileSync('herdr', ${JSON.stringify(args)}, { stdio: 'ignore' });
+      execFileSync('herdr', ['pane', 'send-text', ${JSON.stringify(paneId)}, ${JSON.stringify(sendText)}], { stdio: 'ignore' });
+      execFileSync('herdr', ['pane', 'send-keys', ${JSON.stringify(paneId)}, 'enter'], { stdio: 'ignore' });
+    } catch {}
+  `;
+  const child = spawn(process.execPath, ['-e', script], { detached: true, stdio: 'ignore' });
+  child.unref();
+}
+
+function open(session, command, { background = false, sendText = null } = {}) {
   const args = [
     'tab', 'create',
     '--workspace', process.env.HERDR_WORKSPACE_ID,
@@ -43,6 +64,11 @@ function open(session, command, { background = false } = {}) {
 
   const [kind, ...resumeArgs] = command;
   const agentName = `sw${Date.now().toString().slice(-6)}`;
+
+  if (sendText) {
+    spawnAgentThenSend({ agentName, kind, paneId, resumeArgs, sendText });
+    return;
+  }
 
   // "herdr agent start" so retorna depois que o agente esta pronto para
   // interagir - para o Claude isso mede segundos, nao milissegundos. Esperar

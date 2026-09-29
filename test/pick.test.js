@@ -77,3 +77,36 @@ test('no lote, so a ultima sessao abre em primeiro plano', (t) => {
     { id: 'c', background: false },
   ]);
 });
+
+test('com --send, cada sessao do lote recebe o mesmo texto pra mandar', (t) => {
+  const chamadas = [];
+  t.mock.method(backends, 'openSession', (session, _backends, opts) => {
+    chamadas.push({ id: session.sessionId, sendText: opts && opts.sendText });
+    return { backend: 'fake', failures: [] };
+  });
+
+  delete require.cache[require.resolve('../src/pick')];
+  const { openBatch } = require('../src/pick');
+
+  openBatch([{ sessionId: 'a' }, { sessionId: 'b' }], 'onde paramos?');
+
+  assert.deepStrictEqual(chamadas, [
+    { id: 'a', sendText: 'onde paramos?' },
+    { id: 'b', sendText: 'onde paramos?' },
+  ]);
+});
+
+test('sem --send, sendText vai null - nenhum backend tenta mandar nada', (t) => {
+  const chamadas = [];
+  t.mock.method(backends, 'openSession', (session, _backends, opts) => {
+    chamadas.push(opts && opts.sendText);
+    return { backend: 'fake', failures: [] };
+  });
+
+  delete require.cache[require.resolve('../src/pick')];
+  const { openBatch } = require('../src/pick');
+
+  openBatch([{ sessionId: 'a' }]);
+
+  assert.deepStrictEqual(chamadas, [null]);
+});

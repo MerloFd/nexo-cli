@@ -291,6 +291,48 @@ test('herdr abre a aba com execFileSync mas inicia o agente em segundo plano', (
   else process.env.HERDR_WORKSPACE_ID = antes;
 });
 
+test('com sendText, herdr manda tudo (agent start + texto + enter) num processo node separado', (t) => {
+  const cp = require('child_process');
+
+  const execFileSyncMock = t.mock.method(cp, 'execFileSync', (bin, args) => {
+    if (args[0] === 'tab' && args[1] === 'create') {
+      return JSON.stringify({ result: { root_pane: { pane_id: 'w1:p1' } } });
+    }
+    throw new Error(`chamada sincrona inesperada: herdr ${args.join(' ')}`);
+  });
+  const spawnMock = t.mock.method(cp, 'spawn', () => ({ unref: () => {} }));
+
+  const antes = process.env.HERDR_WORKSPACE_ID;
+  process.env.HERDR_WORKSPACE_ID = 'w1';
+
+  delete require.cache[require.resolve('../src/backends/herdr')];
+  const herdr = require('../src/backends/herdr');
+
+  herdr.open(
+    { dir: 'C:\DEV' },
+    ['claude', '-r', 'e05d7ab3-bf50-4d3c-b408-8c0f9164f268'],
+    { sendText: 'onde paramos? "aspas" e \'aspas simples\'' }
+  );
+
+  assert.strictEqual(execFileSyncMock.mock.calls.length, 1, 'so tab create e sincrono, o resto vai no processo filho');
+  assert.strictEqual(spawnMock.mock.calls.length, 1);
+
+  const [bin, args] = spawnMock.mock.calls[0].arguments;
+  assert.strictEqual(bin, process.execPath, 'roda num node separado, nao trava esperando o agente ficar pronto');
+  assert.strictEqual(args[0], '-e');
+
+  const script = args[1];
+  assert.ok(script.includes(JSON.stringify('w1:p1')), 'referencia o pane certo');
+  assert.ok(
+    script.includes(JSON.stringify('onde paramos? "aspas" e \'aspas simples\'')),
+    'o texto vai escapado como string JS valida, nunca interpolado cru'
+  );
+  assert.ok(script.includes("'send-keys'"), 'manda enter depois do texto');
+
+  if (antes === undefined) delete process.env.HERDR_WORKSPACE_ID;
+  else process.env.HERDR_WORKSPACE_ID = antes;
+});
+
 test('herdr so passa --no-focus quando aberto em segundo plano', (t) => {
   const cp = require('child_process');
 

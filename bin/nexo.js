@@ -23,6 +23,7 @@ Options:
   --redact            in scan, remove high-confidence secrets (Claude only)
   --week              in usage, group by week instead of day
   --open <id>         open that session directly (a prefix is enough)
+  --send <text>       ask to send this text to every session you open (Herdr only)
 
 In the list:
   type                searches right away, no prefix needed
@@ -36,7 +37,7 @@ In the list:
 const COMMANDS = new Set(['scan', 'usage', 'lang']);
 
 function parseArgs(argv) {
-  const flags = { list: false, json: false, help: false, open: null, week: false, redact: false };
+  const flags = { list: false, json: false, help: false, open: null, week: false, redact: false, send: null };
   const terms = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -47,6 +48,7 @@ function parseArgs(argv) {
     else if (arg === '--week' || arg === '--semana') flags.week = true;
     else if (arg === '--redact') flags.redact = true;
     else if (arg === '--open') flags.open = argv[++i] || '';
+    else if (arg === '--send') flags.send = argv[++i] || '';
     else if (!arg.startsWith('-')) terms.push(arg);
   }
 
@@ -55,8 +57,8 @@ function parseArgs(argv) {
   return { flags, command, args: terms, query: terms.join(' ') };
 }
 
-function reportOpen(session) {
-  const { backend, failures } = openSession(session);
+function reportOpen(session, sendText) {
+  const { backend, failures } = openSession(session, undefined, { sendText: sendText || null });
   failures.forEach((f) => console.error(t('cli.warning', { message: f })));
   console.log(
     t('cli.opening', { dir: session.dir, id: session.sessionId.slice(0, 8), backend })
@@ -101,7 +103,7 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    reportOpen(match);
+    reportOpen(match, flags.send);
     return;
   }
 
@@ -145,7 +147,7 @@ async function main() {
     return;
   }
 
-  const { chosen, batch } = await pickSession(sessions);
+  const { chosen, batch, sendText } = await pickSession(sessions, { sendPrompt: flags.send });
 
   // O lote (Tab pra marcar, Enter pra abrir tudo de uma vez) so existe depois
   // que o seletor fecha, porque a tela estava em modo alternativo ate agora;
@@ -171,7 +173,7 @@ async function main() {
     return;
   }
 
-  reportOpen(chosen);
+  reportOpen(chosen, sendText);
   if (primeiraVez) console.log(t('cli.langHint'));
 }
 

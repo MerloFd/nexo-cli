@@ -74,6 +74,31 @@ opens the highlighted session and closes the list.
 The label is the session's real name: the one you set with `/rename`, or the one
 the agent generated, or your first message — in that order.
 
+### `--send`, resuming several sessions at once
+
+```
+nexo --send "where did we leave off?"
+```
+
+Closing several agents and having to open each one back up just to ask it
+where it stopped gets old fast. With `--send`, opening a session (or a whole
+batch marked with Tab) asks first — a modal, defaulting to **No** — and only
+sends the text once you confirm with **S**:
+
+```
+┌───────────────────────────────────────────────────────┐
+│ Send this message to these 3 sessions about to open?  │
+│                                                        │
+│ "where did we leave off?"                             │
+│                                                        │
+│ [Enter] No (default)    [S] Yes    [Esc] cancel       │
+└────────────────────────────────────────────────────────┘
+```
+
+Herdr-only for now: it needs to know when the agent has actually finished
+booting before typing into its pane, something only the Herdr backend can do
+today.
+
 **Ctrl+←/→** cycles a filter tab — every agent that has a session, plus "all" —
 shown above the list once more than one agent is present. A side-by-side
 preview of the highlighted session's conversation is on by default whenever
