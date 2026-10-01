@@ -5,6 +5,7 @@ const { createState, applyKey, render, syncOffset, markAndAdvance, previewActive
 const { extractCtrlEnter } = require('./ctrlEnter');
 const { openSession } = require('./backends');
 const { loadPreview } = require('./preview');
+const { AGENTS } = require('./agents');
 
 const ALT_SCREEN_ON = '\x1b[?1049h';
 const ALT_SCREEN_OFF = '\x1b[?1049l';
@@ -34,9 +35,10 @@ function toRows(sessions) {
 // linha em branco + cabecalho + linha em branco + caixa de busca (3) + abas
 // de agente + indicadores de rolagem (2) + linha em branco + rodape = 12
 // linhas fixas fora da lista (a linha de abas sempre ocupa espaco, mesmo
-// vazia com um agente so - ver comentario em selector.js/filterBar)
+// vazia com um agente so - ver comentario em selector.js/filterBar), mais 2
+// pela linha fixa de "nova sessao" (ela + o respiro em branco depois dela).
 function viewportFor(rows) {
-  return Math.max(1, Math.floor(((rows || 24) - 12) / 2));
+  return Math.max(1, Math.floor(((rows || 24) - 14) / 2));
 }
 
 // Abre uma sessao marcada como parte do lote final, disparado pelo Enter.
@@ -69,6 +71,7 @@ function pickInteractive(sessions, { sendPrompt = null } = {}) {
     color: !process.env.NO_COLOR,
     cwd: process.cwd(),
     sendPrompt,
+    newSessionAgents: AGENTS.map((a) => a.id),
   });
 
   return new Promise((resolve) => {
@@ -135,18 +138,18 @@ function pickInteractive(sessions, { sendPrompt = null } = {}) {
       draw();
     };
 
-    const finish = (result, sendText = null) => {
+    const finish = (result, sendText = null, newSessionAgent = null) => {
       process.stdin.removeListener('data', onRawData);
       decoded.removeListener('keypress', onKeypress);
       out.removeListener('resize', onResize);
       out.write(CURSOR_SHOW + ALT_SCREEN_OFF);
       if (process.stdin.isTTY) process.stdin.setRawMode(Boolean(wasRaw));
       process.stdin.pause();
-      resolve({ chosen: result, batch, sendText });
+      resolve({ chosen: result, batch, sendText, newSessionAgent });
     };
 
     function onKeypress(_str, key) {
-      const { state: next, action, items, send } = applyKey(state, key || {});
+      const { state: next, action, items, send, agent } = applyKey(state, key || {});
       state = next;
 
       if (action === 'cancel') return finish(null);
@@ -155,6 +158,7 @@ function pickInteractive(sessions, { sendPrompt = null } = {}) {
         batch.push(...openBatch(items, send ? sendPrompt : null));
         return finish(null);
       }
+      if (action === 'new-session') return finish(null, null, agent);
       if (action === 'move') {
         ensurePreview();
         draw();

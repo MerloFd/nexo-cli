@@ -15,8 +15,8 @@ test('toRows converte sessoes em linhas renderizaveis', () => {
 test('viewport nunca fica menor que 1, mesmo em terminal minusculo', () => {
   assert.strictEqual(viewportFor(1), 1);
   assert.strictEqual(viewportFor(12), 1);
-  assert.strictEqual(viewportFor(32), 10);
-  assert.strictEqual(viewportFor(undefined), 6);
+  assert.strictEqual(viewportFor(32), 9);
+  assert.strictEqual(viewportFor(undefined), 5);
 });
 
 function manyRows(n) {

@@ -22,6 +22,7 @@ const MESSAGES = {
     'cli.noMatch': 'No session matches "{query}".',
     'cli.cancelled': 'Cancelled.',
     'cli.opening': 'Opening {dir} [{id}] via {backend}',
+    'cli.openingNew': 'Starting a new {agent} session in {dir} via {backend}',
     'cli.warning': 'warning: {message}',
     'cli.vscodeNote':
       'Note: the VS Code terminal cannot open tabs from a command, so I opened an external terminal.',
@@ -93,6 +94,7 @@ const MESSAGES = {
     'cli.noMatch': 'Nenhuma sessao corresponde a "{query}".',
     'cli.cancelled': 'Cancelado.',
     'cli.opening': 'Abrindo {dir} [{id}] via {backend}',
+    'cli.openingNew': 'Iniciando uma sessao nova do {agent} em {dir} via {backend}',
     'cli.warning': 'aviso: {message}',
     'cli.vscodeNote':
       'Nota: o terminal do VS Code nao permite abrir abas por comando; abri um terminal externo.',

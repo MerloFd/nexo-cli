@@ -45,7 +45,15 @@ function inScope(items, scope, cwd) {
 
 function createState(
   items,
-  { viewport = 10, columns = 80, color = true, cwd = null, scope = 'global', sendPrompt = null } = {}
+  {
+    viewport = 10,
+    columns = 80,
+    color = true,
+    cwd = null,
+    scope = 'global',
+    sendPrompt = null,
+    newSessionAgents = [],
+  } = {}
 ) {
   const base = inScope(items, scope, cwd);
 
@@ -65,6 +73,12 @@ function createState(
     previewOn: true,
     sendPrompt,
     confirmSend: null,
+    // Lista vazia desliga a funcionalidade inteira - testes e qualquer outro
+    // uso de createState sem passar isso continuam com o comportamento de
+    // sempre, indice 0 apontando pro primeiro item de verdade.
+    newSessionAgents,
+    atNewSession: newSessionAgents.length > 0,
+    chooseAgent: null,
   };
 }
 
@@ -107,6 +121,9 @@ function toggleMark(state, sessionId) {
 // sem soltar a tecla. Usado pelo Tab e pelo Ctrl+Enter (quando o terminal
 // manda essa combinacao) - os dois so marcam, nunca abrem.
 function markAndAdvance(state) {
+  // Tab na linha fixa de "nova sessao" so avanca - nao ha o que marcar ali.
+  if (state.atNewSession) return move(state, 1, { wrap: true });
+
   const current = state.items[state.index];
   if (!current) return state;
   return move(toggleMark(state, current.sessionId), 1, { wrap: true });
@@ -129,8 +146,29 @@ function syncOffset(state) {
   return { ...state, offset: Math.min(Math.max(0, offset), maxOffset) };
 }
 
+// Com "nova sessao" ligado, a navegacao ganha uma posicao virtual (-1) antes
+// do primeiro item de verdade - o espaco todo vai de -1 a total-1, tamanho
+// total+1. Sem newSessionAgents (lista vazia), total+1 nunca entra em jogo:
+// o calculo cai direto no comportamento de sempre.
 function move(state, delta, { wrap = false } = {}) {
   const total = state.items.length;
+
+  if (state.newSessionAgents.length > 0) {
+    if (total === 0) return { ...state, atNewSession: true };
+
+    let pos = state.atNewSession ? -1 : state.index;
+    pos += delta;
+
+    if (wrap) {
+      pos = (((pos + 1) % (total + 1)) + (total + 1)) % (total + 1) - 1;
+    } else {
+      pos = Math.min(Math.max(-1, pos), total - 1);
+    }
+
+    if (pos === -1) return syncOffset({ ...state, atNewSession: true, index: 0 });
+    return syncOffset({ ...state, atNewSession: false, index: pos });
+  }
+
   if (total === 0) return state;
 
   let index = state.index + delta;
@@ -198,6 +236,28 @@ function selectOrNothing(state) {
   return { state, action: 'select' };
 }
 
+// Enquanto o modal de escolha de provedor esta na tela, so setas (cicla),
+// Enter (confirma) e Esc (cancela, volta pra lista) existem.
+function applyKeyDuringChooseAgent(state, key) {
+  const name = key.name || '';
+  const total = state.newSessionAgents.length;
+
+  if (name === 'escape') return { state: { ...state, chooseAgent: null }, action: 'move' };
+
+  if (name === 'up' || name === 'down') {
+    const delta = name === 'up' ? -1 : 1;
+    const index = ((state.chooseAgent.index + delta) % total + total) % total;
+    return { state: { ...state, chooseAgent: { index } }, action: 'move' };
+  }
+
+  if (name === 'return' || name === 'enter') {
+    const agent = state.newSessionAgents[state.chooseAgent.index];
+    return { state: { ...state, chooseAgent: null }, action: 'new-session', agent };
+  }
+
+  return { state, action: 'none' };
+}
+
 // A busca esta sempre ativa: qualquer caractere imprimivel vai para o termo,
 // como no /resume do Claude Code. Por isso a navegacao fica nas setas - letra
 // nenhuma pode ser atalho, ou seria impossivel buscar por ela.
@@ -224,12 +284,17 @@ function applyKey(state, key = {}) {
   const seq = key.sequence || '';
 
   if (key.ctrl && (name === 'c' || name === 'd')) return { state, action: 'cancel' };
+  if (state.chooseAgent) return applyKeyDuringChooseAgent(state, key);
   if (state.confirmSend) return applyKeyDuringConfirm(state, key);
   if (key.ctrl && name === 'a') return { state: toggleScope(state), action: 'move' };
   if (key.ctrl && name === 'right') return { state: cycleAgentFilter(state, 1), action: 'move' };
   if (key.ctrl && name === 'left') return { state: cycleAgentFilter(state, -1), action: 'move' };
   if (key.ctrl && name === 't') return { state: { ...state, previewOn: !state.previewOn }, action: 'move' };
   if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n') {
+    // Enter na linha fixa de "nova sessao" pergunta o provedor antes de abrir
+    // qualquer coisa - nunca entra no fluxo de selecionar/lote/--send.
+    if (state.atNewSession) return { state: { ...state, chooseAgent: { index: 0 } }, action: 'move' };
+
     const resultado = selectOrNothing(state);
     if (state.sendPrompt && (resultado.action === 'select' || resultado.action === 'open-batch')) {
       const items = resultado.action === 'open-batch' ? resultado.items : [state.items[state.index].ref];
@@ -589,7 +654,50 @@ function renderConfirmSend(state) {
   ].join('\n');
 }
 
+// Linha fixa no topo da lista, antes de qualquer sessao de verdade - sempre
+// visivel, nunca afetada por busca/escopo/filtro de agente. Lista vazia em
+// newSessionAgents desliga a funcionalidade inteira (retorna nada).
+function renderNewSessionRow(state) {
+  if (state.newSessionAgents.length === 0) return [];
+  const selecionado = state.atNewSession;
+  const texto = `${selecionado ? '> ' : '  '}+ New session`;
+  return [selecionado ? paint(state, ANSI.bold + ANSI.cyan, texto) : texto, ''];
+}
+
+function renderChooseAgent(state) {
+  // Largura e preenchimento sempre em cima do texto PLANO - colorir antes de
+  // padEnd conta os bytes invisiveis do ANSI como se fossem coluna de
+  // verdade, desalinhando so a linha destacada (confirmado ao vivo: a borda
+  // direita daquela linha especifica ficava fora de posicao).
+  const planas = [
+    'Which provider?',
+    '',
+    ...state.newSessionAgents.map((agent, i) => `${i === state.chooseAgent.index ? '>' : ' '} ${agent}`),
+    '',
+    '[Enter] open    [Esc] cancel',
+  ];
+  const largura = Math.min(Math.max(...planas.map((l) => l.length)) + 4, Math.max(20, state.columns - 4));
+
+  const corpo = planas.map((linha, i) => {
+    const preenchida = linha.padEnd(largura - 2);
+    const colorida =
+      i >= 2 && i < 2 + state.newSessionAgents.length && i - 2 === state.chooseAgent.index
+        ? paint(state, ANSI.bold + ANSI.cyan, preenchida)
+        : preenchida;
+    return `  │ ${colorida} │`;
+  });
+
+  return [
+    '',
+    paint(state, ANSI.dim, `  ┌${'─'.repeat(largura)}┐`),
+    ...corpo,
+    paint(state, ANSI.dim, `  └${'─'.repeat(largura)}┘`),
+    '',
+  ].join('\n');
+}
+
 function render(state, previewLines) {
+  if (state.chooseAgent) return renderChooseAgent(state);
   if (state.confirmSend) return renderConfirmSend(state);
 
   const { items, index, offset, viewport, columns } = state;
@@ -598,7 +706,7 @@ function render(state, previewLines) {
   const bodyState = { ...state, columns: bodyWidth };
   const lines = ['', header(state), '', ...searchBox(state), filterBar(state), ''];
 
-  const corpo = [];
+  const corpo = [...renderNewSessionRow(bodyState)];
   if (items.length === 0) {
     corpo.push(paint(bodyState, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')));
   } else {
@@ -606,7 +714,9 @@ function render(state, previewLines) {
 
     const end = Math.min(offset + viewport, items.length);
     const widths = columnWidths(items.slice(offset, end));
-    for (let i = offset; i < end; i++) corpo.push(...renderItem(bodyState, items[i], i === index, widths));
+    for (let i = offset; i < end; i++) {
+      corpo.push(...renderItem(bodyState, items[i], i === index && !state.atNewSession, widths));
+    }
 
     const abaixo = items.length - end;
     corpo.push(abaixo > 0 ? paint(bodyState, ANSI.dim, '  ' + t('ui.scroll.down', { n: abaixo })) : '');
@@ -614,7 +724,7 @@ function render(state, previewLines) {
 
   let miolo = corpo;
   let meio = null;
-  if (previewActive(state) && items.length > 0) {
+  if (previewActive(state) && items.length > 0 && !state.atNewSession) {
     const largura = bodyWidth - 3; // 3 = " │ "
     const leftWidth = Math.floor(largura * PREVIEW_RATIO);
     const rightWidth = largura - leftWidth;

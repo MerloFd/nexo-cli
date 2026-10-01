@@ -114,6 +114,28 @@ opens the highlighted session and closes the list.
 The label is the session's real name: the one you set with `/rename`, or the one
 the agent generated, or your first message — in that order.
 
+### Starting a new session
+
+The list always opens with **+ New session** pinned above every real session.
+Enter on it asks which provider:
+
+```
+┌────────────────────────────────┐
+│ Which provider?                │
+│                                │
+│ > claude                       │
+│   codex                        │
+│   opencode                     │
+│                                │
+│ [Enter] open    [Esc] cancel   │
+└────────────────────────────────┘
+```
+
+Arrows (wrapping) pick a provider, Enter starts it in the current directory,
+Esc backs out without starting anything. It opens through the exact same
+backend chain as resuming a session — agnostic of terminal, same as
+everything else in the list.
+
 ### `--send`, resuming several sessions at once
 
 ```

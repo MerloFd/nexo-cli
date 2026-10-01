@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { openSession, assertValidSession } = require('../src/backends');
+const { openSession, openNewSession, assertValidSession } = require('../src/backends');
 
 const valid = {
   agent: 'claude',
@@ -76,6 +76,29 @@ test('pula backend indisponivel', () => {
   const result = openSession(valid, [indisponivel, disponivel]);
   assert.strictEqual(result.backend, 'disponivel');
   assert.strictEqual(indisponivel.calls.length, 0);
+});
+
+test('openNewSession usa a mesma cadeia de backends, sem sessao nenhuma de verdade', () => {
+  const primeiro = stub('primeiro');
+
+  const result = openNewSession('claude', 'C:\\DEV\\Projeto', [primeiro]);
+
+  assert.strictEqual(result.backend, 'primeiro');
+  assert.deepStrictEqual(result.command, ['claude'], 'so o nome do CLI, sem flag de resume');
+  assert.strictEqual(primeiro.calls[0].dir, 'C:\\DEV\\Projeto');
+});
+
+test('openNewSession tambem pula backend indisponivel, igual a sessao existente', () => {
+  const indisponivel = stub('indisponivel', { available: false });
+  const disponivel = stub('disponivel');
+
+  const result = openNewSession('codex', 'C:\\DEV', [indisponivel, disponivel]);
+  assert.strictEqual(result.backend, 'disponivel');
+  assert.strictEqual(indisponivel.calls.length, 0);
+});
+
+test('openNewSession com agente desconhecido falha claro', () => {
+  assert.throws(() => openNewSession('inexistente', 'C:\\DEV', [stub('x')]), /desconhecido/);
 });
 
 test('backend que falha cai pro proximo e reporta o erro', () => {

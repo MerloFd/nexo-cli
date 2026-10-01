@@ -2,7 +2,7 @@
 const { daysAgo } = require('../src/scanSessions');
 const { scanAll } = require('../src/agents');
 const { pickSession, printPlainList } = require('../src/pick');
-const { openSession } = require('../src/backends');
+const { openSession, openNewSession } = require('../src/backends');
 const { filterItems } = require('../src/selector');
 const { t } = require('../src/i18n');
 const { isFirstRun } = require('../src/config');
@@ -29,7 +29,7 @@ In the list:
   type                searches right away, no prefix needed
   arrows, ctrl+p/n    move
   ctrl+a              switch between every folder and the current one
-  enter               open the session
+  enter               open the session (the first row starts a new one instead)
   tab                 mark the session (repeat on more), enter opens them all
   esc                 clears the search; with it empty, quits
 `;
@@ -75,6 +75,13 @@ function reportOpen(session, sendText) {
   if (sendText && !sendSupported) {
     console.log(t('cli.sendUnsupported', { backend }));
   }
+}
+
+function reportNewSession(agentId) {
+  const dir = process.cwd();
+  const { backend, failures } = openNewSession(agentId, dir);
+  failures.forEach((f) => console.error(t('cli.warning', { message: f })));
+  console.log(t('cli.openingNew', { agent: agentId, dir, backend }));
 }
 
 async function main() {
@@ -153,7 +160,13 @@ async function main() {
     return;
   }
 
-  const { chosen, batch, sendText } = await pickSession(sessions, { sendPrompt: flags.send });
+  const { chosen, batch, sendText, newSessionAgent } = await pickSession(sessions, { sendPrompt: flags.send });
+
+  if (newSessionAgent) {
+    reportNewSession(newSessionAgent);
+    if (primeiraVez) console.log(t('cli.langHint'));
+    return;
+  }
 
   // O lote (Tab pra marcar, Enter pra abrir tudo de uma vez) so existe depois
   // que o seletor fecha, porque a tela estava em modo alternativo ate agora;
