@@ -357,10 +357,15 @@ function formatTurns(turns) {
 }
 
 // Cor fixa por agente, usando a cor real de cada marca (nao uma escolhida por
-// nos) - terracota do Claude e verde do OpenAI/Codex, ambas em truecolor pra
-// bater com a marca de verdade. Fora da paleta do age (verde/ciano/amarelo/
-// dim) de proposito, senao os dois significados se confundiriam na mesma cor.
-const AGENT_COLOR = { claude: '\x1b[38;2;217;119;87m', codex: '\x1b[38;2;16;163;127m' };
+// nos) - terracota do Claude, verde do OpenAI/Codex, azul do accent do
+// opencode.ai, todas em truecolor pra bater com a marca de verdade. Fora da
+// paleta do age (verde/ciano/amarelo/dim) de proposito, senao os dois
+// significados se confundiriam na mesma cor.
+const AGENT_COLOR = {
+  claude: '\x1b[38;2;217;119;87m',
+  codex: '\x1b[38;2;16;163;127m',
+  opencode: '\x1b[38;2;0;122;255m',
+};
 const DIR_COLUMN_MAX = 36;
 
 // Path inteiro na tabela faria a coluna variar demais de sessao pra sessao,
@@ -660,11 +665,26 @@ function renderConfirmSend(state) {
 function renderNewSessionRow(state) {
   if (state.newSessionAgents.length === 0) return [];
   const selecionado = state.atNewSession;
-  const texto = `${selecionado ? '> ' : '  '}+ New session`;
-  return [selecionado ? paint(state, ANSI.bold + ANSI.cyan, texto) : texto, ''];
+  const marcador = selecionado ? '> ' : '  ';
+  const rotulo = `${marcador}[+] - New session`;
+  // Negrito sempre, selecionado ou nao - e uma acao fixa, nao so mais um
+  // item da lista, e deve se destacar das sessoes mesmo sem estar destacada.
+  const texto = paint(state, selecionado ? ANSI.bold + ANSI.cyan : ANSI.bold, rotulo);
+  const cwd = paint(state, ANSI.dim, normalizeDir(state.cwd || process.cwd()));
+  return [`${texto} · ${cwd}`, ''];
+}
+
+// Caixa centralizada na largura do terminal, com respiro de verdade nas
+// bordas (3 espacos de cada lado) - encostada na margem esquerda, como a
+// caixa de confirmacao do --send, ficava "colada" demais pra uma escolha
+// que merece destaque visual proprio.
+function centerBox(columns, largura) {
+  return ' '.repeat(Math.max(0, Math.floor((columns - (largura + 2)) / 2)));
 }
 
 function renderChooseAgent(state) {
+  const PAD = 3;
+
   // Largura e preenchimento sempre em cima do texto PLANO - colorir antes de
   // padEnd conta os bytes invisiveis do ANSI como se fossem coluna de
   // verdade, desalinhando so a linha destacada (confirmado ao vivo: a borda
@@ -676,22 +696,31 @@ function renderChooseAgent(state) {
     '',
     '[Enter] open    [Esc] cancel',
   ];
-  const largura = Math.min(Math.max(...planas.map((l) => l.length)) + 4, Math.max(20, state.columns - 4));
+  const conteudo = Math.max(...planas.map((l) => l.length));
+  const largura = Math.min(conteudo + PAD * 2, Math.max(20, state.columns - 4));
+  const espaco = ' '.repeat(PAD);
 
   const corpo = planas.map((linha, i) => {
-    const preenchida = linha.padEnd(largura - 2);
-    const colorida =
-      i >= 2 && i < 2 + state.newSessionAgents.length && i - 2 === state.chooseAgent.index
-        ? paint(state, ANSI.bold + ANSI.cyan, preenchida)
-        : preenchida;
-    return `  │ ${colorida} │`;
+    const preenchida = linha.padEnd(largura - PAD * 2);
+    const agentIdx = i - 2;
+    const ehLinhaDeAgente = agentIdx >= 0 && agentIdx < state.newSessionAgents.length;
+
+    if (!ehLinhaDeAgente) return `│${espaco}${preenchida}${espaco}│`;
+
+    // Mesma cor da marca que a lista principal usa - so o negrito muda,
+    // marcando qual provedor esta destacado agora.
+    const cor = AGENT_COLOR[state.newSessionAgents[agentIdx]] || ANSI.white;
+    const selecionado = agentIdx === state.chooseAgent.index;
+    const colorida = paint(state, selecionado ? ANSI.bold + cor : cor, preenchida);
+    return `│${espaco}${colorida}${espaco}│`;
   });
 
+  const margem = centerBox(state.columns, largura);
   return [
     '',
-    paint(state, ANSI.dim, `  ┌${'─'.repeat(largura)}┐`),
-    ...corpo,
-    paint(state, ANSI.dim, `  └${'─'.repeat(largura)}┘`),
+    paint(state, ANSI.dim, `${margem}┌${'─'.repeat(largura)}┐`),
+    ...corpo.map((l) => `${margem}${l}`),
+    paint(state, ANSI.dim, `${margem}└${'─'.repeat(largura)}┘`),
     '',
   ].join('\n');
 }

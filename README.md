@@ -116,19 +116,21 @@ the agent generated, or your first message — in that order.
 
 ### Starting a new session
 
-The list always opens with **+ New session** pinned above every real session.
-Enter on it asks which provider:
+The list always opens with **[+] - New session** pinned above every real
+session, bold, with the current directory in dim right after it. Enter on it
+asks which provider, centered on screen and each one colored with its own
+brand (the same colors used in the list):
 
 ```
-┌────────────────────────────────┐
-│ Which provider?                │
-│                                │
-│ > claude                       │
-│   codex                        │
-│   opencode                     │
-│                                │
-│ [Enter] open    [Esc] cancel   │
-└────────────────────────────────┘
+                  ┌──────────────────────────────────┐
+                  │   Which provider?                │
+                  │                                  │
+                  │   > claude                       │
+                  │     codex                        │
+                  │     opencode                     │
+                  │                                  │
+                  │   [Enter] open    [Esc] cancel   │
+                  └──────────────────────────────────┘
 ```
 
 Arrows (wrapping) pick a provider, Enter starts it in the current directory,

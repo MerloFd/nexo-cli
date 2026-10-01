@@ -539,7 +539,7 @@ test('render mostra a linha de nova sessao destacada e o modal lista os provedor
   let state = createState(items(3), { viewport: 3, columns: 90, color: false, newSessionAgents: ['claude', 'codex'] });
 
   const lista = render(state);
-  assert.ok(lista.includes('> + New session'));
+  assert.ok(lista.includes('> [+] - New session'));
 
   state = applyKey(state, { name: 'return' }).state;
   const modal = render(state);
@@ -559,6 +559,53 @@ test('modal de provedor: a borda direita fica na mesma coluna em toda linha, mes
 
   const posicoes = new Set(linhas.map((l) => visibleLength(l)));
   assert.strictEqual(posicoes.size, 1, `linhas com largura visivel diferente: ${[...posicoes]}`);
+});
+
+test('modal de provedor fica centralizado na largura do terminal, nao colado na margem esquerda', () => {
+  const { createState, applyKey, render } = require('../src/selector');
+  let state = createState(items(3), {
+    viewport: 3,
+    columns: 120,
+    color: false,
+    newSessionAgents: ['claude', 'codex'],
+  });
+  state = applyKey(state, { name: 'return' }).state;
+
+  const topo = render(state).split('\n').find((l) => l.includes('┌'));
+  const margemEsquerda = topo.length - topo.trimStart().length;
+  assert.ok(margemEsquerda > 10, `esperava margem grande num terminal largo, veio ${margemEsquerda}`);
+});
+
+test('cada provedor no modal usa a mesma cor da marca que a lista principal', () => {
+  const { createState, applyKey, render, ANSI } = require('../src/selector');
+  let state = createState(items(3), {
+    viewport: 3,
+    columns: 90,
+    color: true,
+    newSessionAgents: ['claude', 'codex', 'opencode'],
+  });
+  state = applyKey(state, { name: 'return' }).state;
+
+  const out = render(state);
+  assert.ok(out.includes('\x1b[38;2;217;119;87m'), 'claude com a cor terracota da marca');
+  assert.ok(out.includes('\x1b[38;2;16;163;127m'), 'codex com o verde da marca');
+  assert.ok(out.includes('\x1b[38;2;0;122;255m'), 'opencode com o azul da marca');
+});
+
+test('linha de nova sessao mostra o texto combinado e o path atual em cinza', () => {
+  const { createState, render, ANSI } = require('../src/selector');
+  const state = createState(items(3), {
+    viewport: 3,
+    columns: 90,
+    color: true,
+    cwd: 'C:\\DEV\\Projeto',
+    newSessionAgents: ['claude', 'codex'],
+  });
+
+  const out = render(state);
+  assert.ok(out.includes('[+] - New session'));
+  assert.ok(out.includes('C:\\DEV\\Projeto'));
+  assert.ok(out.includes(`${ANSI.dim}C:\\DEV\\Projeto${ANSI.reset}`), 'path pintado em dim');
 });
 
 test('idade recente, de hoje, da semana e antiga ganham cores diferentes', () => {
