@@ -1,7 +1,7 @@
 // Estado e render puros da tela interativa do "nexo scan" - mesma separacao
 // do selector.js: nada aqui toca arquivo, terminal ou I/O. O loop de teclado
 // e a redacao de verdade ficam em src/scan/interactive.js.
-const { ANSI } = require('./selector');
+const { ANSI, MARKER_SELECTED, padVisible } = require('./selector');
 const { t } = require('./i18n');
 
 // So achado de alta confianca numa sessao do Claude entra na lista
@@ -133,14 +133,24 @@ const CONFIDENCE_COLOR = { alta: ANSI.red, media: ANSI.yellow, baixa: ANSI.dim }
 const CONFIDENCE_TAG = { alta: 'scan.tag.alta', media: 'scan.tag.media', baixa: 'scan.tag.baixa' };
 
 function renderRow(state, row, selecionado) {
-  const marcador = state.marked.has(row.key) ? '✓ ' : selecionado ? '> ' : '  ';
-  const tag = paint(state, CONFIDENCE_COLOR[row.confidence], t(CONFIDENCE_TAG[row.confidence]).padEnd(5));
+  const marcador = state.marked.has(row.key) ? '✓ ' : selecionado ? MARKER_SELECTED : '  ';
+  const tagPlano = t(CONFIDENCE_TAG[row.confidence]).padEnd(5);
   const vezes = row.occurrences > 1 ? ` (${row.occurrences}x)` : '';
-  const texto = `${marcador}${tag}  ${row.label.padEnd(28)}  ${row.masked.padEnd(14)}${vezes}`.trimEnd();
-  const meta = `      ${row.agent} · ${row.title} · ${t('scan.lineLabel', { n: row.firstLine })}`;
+  const metaPlano = `      ${row.agent} · ${row.title} · ${t('scan.lineLabel', { n: row.firstLine })}`;
 
-  if (!selecionado) return [texto, paint(state, ANSI.dim, meta)];
-  return [paint(state, ANSI.bold + ANSI.cyan, texto), paint(state, ANSI.white, meta)];
+  if (!selecionado) {
+    const tag = paint(state, CONFIDENCE_COLOR[row.confidence], tagPlano);
+    const texto = `${marcador}${tag}  ${row.label.padEnd(28)}  ${row.masked.padEnd(14)}${vezes}`.trimEnd();
+    return [texto, paint(state, ANSI.dim, metaPlano)];
+  }
+
+  // Linha selecionada vira barra inteira (reverse video) - precisa montar o
+  // texto PLANO primeiro (tag sem cor propria ainda) pra padEnd ir ate a
+  // borda antes de pintar, senao a barra para onde o texto acaba.
+  const textoPlano = `${marcador}${tagPlano}  ${row.label.padEnd(28)}  ${row.masked.padEnd(14)}${vezes}`.trimEnd();
+  const texto = paint(state, ANSI.reverse + ANSI.bold + ANSI.cyan, padVisible(state, textoPlano, state.columns));
+  const meta = paint(state, ANSI.reverse + ANSI.cyan, padVisible(state, metaPlano, state.columns));
+  return [texto, meta];
 }
 
 function renderConfirm(state) {

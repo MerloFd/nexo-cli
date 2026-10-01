@@ -142,7 +142,7 @@ test('render marca a linha selecionada e respeita a largura', () => {
   const lines = render(state).split('\n');
   lines.forEach((line) => assert.ok(line.length <= 80, `linha excede 80 colunas: ${line}`));
 
-  const marked = lines.filter((l) => l.includes('│> '));
+  const marked = lines.filter((l) => l.includes('│❯ '));
   assert.strictEqual(marked.length, 1);
   assert.ok(marked[0].includes('resumo da sessao 1'));
 });
@@ -185,7 +185,7 @@ test('cada sessao ocupa duas linhas: rotulo em cima, metadados embaixo', () => {
   const meta = lines.find((l) => l.includes('claude'));
   const metaSemBorda = meta.replace(/^\s*│/, '').replace(/│\s*$/, '').trim();
 
-  assert.ok(head.includes('│> '), 'a primeira linha traz o marcador e o rotulo');
+  assert.ok(head.includes('│❯ '), 'a primeira linha traz o marcador e o rotulo');
   assert.deepStrictEqual(metaSemBorda.split(' \u00b7 '), [
     'claude',
     'C:\\DEV',
@@ -278,7 +278,7 @@ test('check some quando o item marcado esta selecionado', () => {
   const linhas = render(state).split('\n');
   const atual = linhas.find((l) => l.includes('resumo da sessao 0'));
 
-  assert.ok(atual.includes('│> '), 'selecao tem prioridade visual sobre o check');
+  assert.ok(atual.includes('│❯ '), 'selecao tem prioridade visual sobre o check');
 });
 
 test('Tab so marca e avanca - nao abre nada', () => {
@@ -576,14 +576,14 @@ test('render mostra a linha de nova sessao destacada, e o painel de provedor fic
   let state = createState(items(3), { viewport: 3, columns: 120, color: false, newSessionAgents: ['claude', 'codex'] });
 
   const lista = render(state);
-  assert.ok(lista.includes('> [+] - New session'));
+  assert.ok(lista.includes('❯ [+] - New session'));
   assert.ok(lista.includes('pick a provider'), 'painel ja aparece so de estar destacada, antes do Enter');
   assert.ok(lista.includes('Buscar') || lista.includes('Search'), 'a lista continua visivel ao lado, nao e um modal');
 
   state = applyKey(state, { name: 'return' }).state;
   const travado = render(state);
   assert.ok(travado.includes('Choose provider:'));
-  assert.ok(travado.includes('> claude'));
+  assert.ok(travado.includes('❯ claude'));
   assert.ok(travado.includes('codex'));
 });
 
@@ -641,20 +641,23 @@ test('linha de nova sessao mostra o texto combinado e o path atual em cinza', ()
 });
 
 test('idade recente, de hoje, da semana e antiga ganham cores diferentes', () => {
-  const base = { dir: 'C:\DEV', sessionId: 'id1', agent: 'claude', summary: 's' };
   const agora = Date.now();
 
-  // A linha selecionada (unica de cada lista) sempre ganha ciano no titulo -
-  // isolar a linha de METADADOS (a segunda) evita que essa cor de selecao se
-  // misture com a cor de idade que o teste quer checar.
+  // A linha selecionada agora vira uma barra inteira em reverse video, sem
+  // cor por campo - por isso o item sob teste entra na SEGUNDA posicao
+  // (index 0, selecionado por padrao, fica so com o dummy) e mantem a
+  // coloracao por campo de sempre.
+  const dummy = { dir: 'C:\\DEV\\dummy', sessionId: 'dummy', agent: 'claude', summary: 'd' };
+  const base = { dir: 'C:\DEV', sessionId: 'id1', agent: 'claude', summary: 's' };
+
   const metaLinhas = [
     { ...base, age: 'agora', mtime: agora - 30 * 60 * 1000 },
     { ...base, age: '5h atras', mtime: agora - 5 * 3600 * 1000 },
     { ...base, age: '3d atras', mtime: agora - 3 * 86400 * 1000 },
     { ...base, age: '2mo atras', mtime: agora - 60 * 86400 * 1000 },
   ].map((item) => {
-    const linhas = render(createState([item], { viewport: 1, columns: 90, color: true })).split('\n');
-    return linhas.find((l) => l.includes('claude'));
+    const linhas = render(createState([dummy, item], { viewport: 2, columns: 90, color: true })).split('\n');
+    return linhas.find((l) => l.includes(item.age));
   });
 
   assert.ok(metaLinhas[0].includes('\x1b[32m'), 'recente (< 1h) e verde');
@@ -893,11 +896,11 @@ test('na linha selecionada, titulo e path saem no mesmo bloco de cor', () => {
   const state = createState(items(2), { viewport: 2, columns: 90, color: true });
   const linhas = render(state).split('\n');
 
-  const selecionada = linhas.find((l) => l.includes('> resumo'));
+  const selecionada = linhas.find((l) => l.includes('❯ resumo'));
   assert.ok(selecionada.includes(ANSI.bold + ANSI.cyan), 'titulo e path selecionados usam a mesma cor');
 });
 
-test('na linha selecionada, os campos apagados (agent/branch/bytes/tokens) viram branco', () => {
+test('linha selecionada vira uma barra inteira (reverse video), nao campos coloridos um a um', () => {
   const item = {
     dir: 'C:\\DEV',
     sessionId: 'id1',
@@ -912,11 +915,12 @@ test('na linha selecionada, os campos apagados (agent/branch/bytes/tokens) viram
   const state = createState([item], { viewport: 1, columns: 90, color: true });
   const meta = render(state).split('\n').find((l) => l.includes('claude'));
 
-  assert.ok(meta.includes(ANSI.white), 'campos apagados usam branco quando a linha esta selecionada');
-  assert.ok(!meta.includes(ANSI.dim), 'nao sobra dim nos campos que deveriam ter virado branco');
+  assert.ok(meta.includes(ANSI.reverse), 'a linha toda vira barra, nao so o texto');
+  assert.ok(!meta.includes(ANSI.dim), 'nao sobra dim na linha destacada');
 });
 
-test('idade mantem a propria cor mesmo na linha selecionada, nao vira branco', () => {
+test('fora da selecao, a idade mantem a propria cor gradiente de sempre', () => {
+  const dummy = { dir: 'C:\\DEV\\dummy', sessionId: 'dummy', agent: 'claude', summary: 'd' };
   const item = {
     dir: 'C:\\DEV',
     sessionId: 'id1',
@@ -926,8 +930,8 @@ test('idade mantem a propria cor mesmo na linha selecionada, nao vira branco', (
     summary: 's',
   };
 
-  const state = createState([item], { viewport: 1, columns: 90, color: true });
-  const meta = render(state).split('\n').find((l) => l.includes('claude'));
+  const state = createState([dummy, item], { viewport: 2, columns: 90, color: true });
+  const meta = render(state).split('\n').find((l) => l.includes('agora'));
 
-  assert.ok(meta.includes(ANSI.green), 'idade recente continua verde mesmo selecionada');
+  assert.ok(meta.includes(ANSI.green), 'idade recente continua verde quando o item nao e o destacado');
 });

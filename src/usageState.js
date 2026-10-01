@@ -4,7 +4,7 @@
 // src/usage/interactive.js.
 const { agrupar, tabela, resumo, human, bar, diaDe, semanaDe } = require('./usage/report');
 const { emptyTotals, addTotals, totalOf } = require('./usage/collect');
-const { ANSI } = require('./selector');
+const { ANSI, MARKER_SELECTED, padVisible } = require('./selector');
 const { t } = require('./i18n');
 
 function rowsFor(samples, periodo) {
@@ -113,12 +113,18 @@ function renderRows(state, rows, grandTotal) {
   for (let i = offset; i < fim; i++) {
     const r = rows[i];
     const selecionado = i === state.index;
-    const marcador = selecionado ? '> ' : '  ';
+    const marcador = selecionado ? MARKER_SELECTED : '  ';
     const barra = bar(r.total, max).padEnd(25);
     const pct =
       grandTotal > 0 ? `  ${`${Math.round((r.total / grandTotal) * 100)}%`.padStart(4)} ${t('usage.ofTotal')}` : '';
     const linha = `${marcador}${String(r.key).padEnd(12)}  ${human(r.total).padStart(6)}  ${barra}${pct}`.trimEnd();
-    linhas.push(selecionado ? paint(state, ANSI.bold + ANSI.cyan, linha) : linha);
+    // Linha selecionada vira barra inteira (reverse video), ate a borda do
+    // terminal - mesmo truque do selector.js e do scanState.js.
+    linhas.push(
+      selecionado
+        ? paint(state, ANSI.reverse + ANSI.bold + ANSI.cyan, padVisible(state, linha, state.columns))
+        : linha
+    );
     linhas.push(''); // respiro entre linhas - sem isso as barras ficavam coladas umas nas outras
   }
 

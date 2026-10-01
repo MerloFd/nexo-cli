@@ -10,7 +10,13 @@ const ANSI = {
   green: '\x1b[32m',
   white: '\x1b[97m',
   red: '\x1b[31m',
+  reverse: '\x1b[7m',
 };
+
+// Seta mais "de verdade" que o ">" ASCII, sem precisar de nenhuma lib - so um
+// glifo Unicode que a maioria dos terminais e fontes ja rendeririza bem
+// (o mesmo usado por prompts como Starship).
+const MARKER_SELECTED = '❯ ';
 
 function normalize(text) {
   return String(text)
@@ -468,18 +474,26 @@ function renderColoredMeta(state, item, selected, widths) {
 // "claude · C:\DEV\App · ..." em vez de disputar espaco com o nome da
 // sessao na primeira linha.
 function renderItem(state, item, selected, widths) {
-  const marker = selected ? '> ' : state.marked.has(item.sessionId) ? '✓ ' : '  ';
+  const marker = selected ? MARKER_SELECTED : state.marked.has(item.sessionId) ? '✓ ' : '  ';
   const label = item.title || item.summary;
   const headTexto = truncate(`${marker}${label}`, state.columns);
 
-  const head = selected ? paint(state, ANSI.bold + ANSI.cyan, headTexto) : headTexto;
-
   const metaPlano = `    ${metaLine(item, widths)}`;
   const cabeMeta = metaPlano.length <= state.columns;
-  const meta = cabeMeta
-    ? renderColoredMeta(state, item, selected, widths)
-    : paint(state, selected ? ANSI.white : ANSI.dim, truncate(metaPlano, state.columns));
+  const metaTexto = cabeMeta ? metaPlano : truncate(metaPlano, state.columns);
 
+  if (!selected) {
+    const meta = cabeMeta ? renderColoredMeta(state, item, selected, widths) : paint(state, ANSI.dim, metaTexto);
+    return [headTexto, meta];
+  }
+
+  // Linha selecionada vira uma barra inteira, nao so o texto colorido -
+  // "reverse video" troca frente/fundo que o terminal ja usa, entao funciona
+  // certo em tema claro ou escuro sem chutar uma cor de fundo fixa (mesmo
+  // truque que fzf/lazygit usam). padVisible preenche ate a borda da linha
+  // ANTES de pintar - senao a barra para onde o texto acaba, nao na borda.
+  const head = paint(state, ANSI.reverse + ANSI.bold + ANSI.cyan, padVisible(state, headTexto, state.columns));
+  const meta = paint(state, ANSI.reverse + ANSI.cyan, padVisible(state, metaTexto, state.columns));
   return [head, meta];
 }
 
@@ -681,7 +695,7 @@ function renderConfirmSend(state) {
 function renderNewSessionRow(state) {
   if (state.newSessionAgents.length === 0) return [];
   const selecionado = state.atNewSession;
-  const marcador = selecionado ? '> ' : state.newSessionMarked ? '✓ ' : '  ';
+  const marcador = selecionado ? MARKER_SELECTED : state.newSessionMarked ? '✓ ' : '  ';
   const rotulo = `${marcador}${t('newSession.row')}`;
   // Negrito sempre, selecionado ou nao - e uma acao fixa, nao so mais um
   // item da lista, e deve se destacar das sessoes mesmo sem estar destacada.
@@ -705,7 +719,7 @@ function renderProviderPanel(state) {
     ...state.newSessionAgents.map((agent, i) => {
       const cor = AGENT_COLOR[agent] || ANSI.white;
       const selecionado = locked && i === idx;
-      const texto = `${selecionado ? '> ' : '  '}${agent}`;
+      const texto = `${selecionado ? MARKER_SELECTED : '  '}${agent}`;
       return paint(state, selecionado ? ANSI.bold + cor : cor, texto);
     }),
     '',
@@ -801,4 +815,6 @@ module.exports = {
   PREVIEW_BREAKPOINT,
   previewActive,
   visibleLength,
+  padVisible,
+  MARKER_SELECTED,
 };
