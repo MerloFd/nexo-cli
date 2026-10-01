@@ -117,26 +117,27 @@ the agent generated, or your first message — in that order.
 ### Starting a new session
 
 The list always opens with **[+] - New session** pinned above every real
-session, bold, with the current directory in dim right after it. Enter on it
-asks which provider, centered on screen and each one colored with its own
-brand (the same colors used in the list):
+session, bold, with the current directory in dim right after it. As soon as
+it's highlighted, the side panel — the same one `Ctrl+T` uses for the
+conversation preview — shows the provider list, each one colored with its own
+brand, no need to press anything first:
 
 ```
-                  ┌──────────────────────────────────┐
-                  │   Which provider?                │
-                  │                                  │
-                  │   > claude                       │
-                  │     codex                        │
-                  │     opencode                     │
-                  │                                  │
-                  │   [Enter] open    [Esc] cancel   │
-                  └──────────────────────────────────┘
+  [+] - New session · C:\DEV\nexo-cli     │ New session · pick a provider
+                                          │
+  Session switcher tool                  │   claude
+    claude · ... · now · HEAD            │   codex
+                                          │   opencode
 ```
 
-Arrows (wrapping) pick a provider, Enter starts it in the current directory,
-Esc backs out without starting anything. It opens through the exact same
-backend chain as resuming a session — agnostic of terminal, same as
-everything else in the list.
+**Tab** marks it just like any other session — useful to open it alongside a
+batch of real ones. **Enter** locks the choice: the panel takes focus (arrows
+pick a provider, Enter confirms, Esc backs out of just this part — any real
+sessions marked with Tab stay marked) and the rest of the list stops
+responding until you decide. Once confirmed, every marked real session opens
+first, and the new one opens **last**, so it's always the one left in focus.
+It goes through the exact same backend chain as resuming a session —
+agnostic of terminal, same as everything else in the list.
 
 ### `--send`, resuming several sessions at once
 

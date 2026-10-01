@@ -60,6 +60,13 @@ function openBatch(items, sendText) {
   return items.map((session, i) => openInBatch(session, { background: i !== last, sendText: sendText || null }));
 }
 
+// Quando a nova sessao entra no lote, ela que fica em foco (aberta depois,
+// por reportNewSession em bin/nexo.js) - entao toda sessao real aqui sobe em
+// segundo plano, sem excecao.
+function openNewSessionBatch(items) {
+  return items.map((session) => openInBatch(session, { background: true }));
+}
+
 function pickInteractive(sessions, { sendPrompt = null } = {}) {
   const rows = toRows(sessions);
   const out = process.stdout;
@@ -158,7 +165,10 @@ function pickInteractive(sessions, { sendPrompt = null } = {}) {
         batch.push(...openBatch(items, send ? sendPrompt : null));
         return finish(null);
       }
-      if (action === 'new-session') return finish(null, null, agent);
+      if (action === 'new-session-batch') {
+        batch.push(...openNewSessionBatch(items));
+        return finish(null, null, agent);
+      }
       if (action === 'move') {
         ensurePreview();
         draw();
@@ -206,4 +216,4 @@ function pickSession(sessions, opts) {
   return pickNonInteractive(sessions);
 }
 
-module.exports = { pickSession, printPlainList, toRows, viewportFor, openInBatch, openBatch };
+module.exports = { pickSession, printPlainList, toRows, viewportFor, openInBatch, openBatch, openNewSessionBatch };

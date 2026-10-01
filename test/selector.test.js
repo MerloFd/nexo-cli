@@ -417,7 +417,7 @@ test('render mostra o modal de confirmacao em vez da lista, quando pendente', ()
 
   const out = render(state);
   assert.ok(out.includes('onde paramos?'), 'mostra o texto que sera mandado');
-  assert.ok(out.includes('[S] Sim'), 'mostra a opcao de confirmar');
+  assert.ok(out.includes('[S] Yes'), 'mostra a opcao de confirmar');
   assert.ok(!out.includes('Buscar'), 'a caixa de busca fica escondida atras do modal');
 });
 
@@ -486,101 +486,133 @@ test('Home vai pra nova sessao; End vai pro ultimo item de verdade', () => {
   assert.strictEqual(end.state.index, 2);
 });
 
-test('Tab na linha de nova sessao so avanca, nao marca nada', () => {
+test('Tab na linha de nova sessao marca ela tambem, e avanca', () => {
   const { createState, applyKey } = require('../src/selector');
   let state = createState(items(3), { viewport: 3, newSessionAgents: ['claude', 'codex'] });
 
   state = applyKey(state, { name: 'tab' }).state;
-  assert.strictEqual(state.marked.size, 0);
+  assert.strictEqual(state.newSessionMarked, true);
+  assert.strictEqual(state.marked.size, 0, 'nao mexe no Set de sessoes reais');
   assert.strictEqual(state.atNewSession, false);
   assert.strictEqual(state.index, 0);
 });
 
-test('Enter na linha de nova sessao abre o modal de escolha de provedor, sem selecionar nada', () => {
+test('Enter na nova sessao (destacada, nada marcado) trava escolhendo provedor', () => {
   const { createState, applyKey } = require('../src/selector');
   const state = createState(items(3), { viewport: 3, newSessionAgents: ['claude', 'codex'] });
 
   const result = applyKey(state, { name: 'return' });
   assert.strictEqual(result.action, 'move', 'ainda nao abre nada de verdade');
-  assert.deepStrictEqual(result.state.chooseAgent, { index: 0 });
+  assert.deepStrictEqual(result.state.pickingProvider, { index: 0 });
+  assert.strictEqual(result.state.newSessionMarked, true, 'autosseleciona quando nada mais estava marcado');
 });
 
-test('no modal de provedor, setas ciclam (com wrap) e Enter confirma o escolhido', () => {
+test('travado escolhendo provedor, setas ciclam (com wrap) e Enter confirma', () => {
   const { createState, applyKey } = require('../src/selector');
   let state = createState(items(3), { viewport: 3, newSessionAgents: ['claude', 'codex', 'opencode'] });
   state = applyKey(state, { name: 'return' }).state;
 
   state = applyKey(state, { name: 'down' }).state;
-  assert.strictEqual(state.chooseAgent.index, 1);
+  assert.strictEqual(state.pickingProvider.index, 1);
 
   state = applyKey(state, { name: 'up' }).state;
   state = applyKey(state, { name: 'up' }).state;
-  assert.strictEqual(state.chooseAgent.index, 2, 'wrap pro ultimo provedor');
+  assert.strictEqual(state.pickingProvider.index, 2, 'wrap pro ultimo provedor');
 
   const result = applyKey(state, { name: 'return' });
-  assert.strictEqual(result.action, 'new-session');
+  assert.strictEqual(result.action, 'new-session-batch');
   assert.strictEqual(result.agent, 'opencode');
-  assert.strictEqual(result.state.chooseAgent, null);
+  assert.deepStrictEqual(result.items, [], 'nenhuma sessao real estava marcada');
+  assert.strictEqual(result.state.pickingProvider, null);
+  assert.strictEqual(result.state.newSessionMarked, false);
 });
 
-test('no modal de provedor, Esc cancela e volta pra lista sem escolher nada', () => {
+test('travado escolhendo provedor, nenhuma outra tecla faz nada', () => {
   const { createState, applyKey } = require('../src/selector');
   let state = createState(items(3), { viewport: 3, newSessionAgents: ['claude', 'codex'] });
   state = applyKey(state, { name: 'return' }).state;
 
-  const result = applyKey(state, { name: 'escape' });
-  assert.strictEqual(result.action, 'move');
-  assert.strictEqual(result.state.chooseAgent, null);
-  assert.strictEqual(result.state.atNewSession, true, 'continua destacada, nada foi aberto');
+  const antes = state;
+  const result = applyKey(state, { sequence: 'x', name: 'x' });
+  assert.strictEqual(result.action, 'none');
+  assert.strictEqual(result.state, antes, 'nem busca, nem navegacao da lista respondem travado');
 });
 
-test('render mostra a linha de nova sessao destacada e o modal lista os provedores', () => {
+test('Esc travado cancela so a nova sessao - marcas de sessoes reais continuam', () => {
+  const { createState, applyKey, move } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3, newSessionAgents: ['claude', 'codex'] });
+
+  state = move(state, 1); // destaca um item real
+  state = applyKey(state, { name: 'tab' }).state; // marca esse item real
+  state = applyKey(state, { name: 'home' }).state; // volta pra nova sessao
+  state = applyKey(state, { name: 'tab' }).state; // marca a nova sessao tambem
+  state = applyKey(state, { name: 'return' }).state; // trava escolhendo provedor
+
+  const result = applyKey(state, { name: 'escape' });
+  assert.strictEqual(result.action, 'move');
+  assert.strictEqual(result.state.pickingProvider, null);
+  assert.strictEqual(result.state.newSessionMarked, false, 'desiste so da nova sessao');
+  assert.strictEqual(result.state.marked.size, 1, 'a marca da sessao real sobrevive');
+});
+
+test('lote com sessao real marcada + nova sessao: o provedor escolhido some junto dos itens reais no resultado', () => {
+  const { createState, applyKey, move } = require('../src/selector');
+  let state = createState(items(3), { viewport: 3, newSessionAgents: ['claude', 'codex'] });
+
+  state = move(state, 1);
+  state = applyKey(state, { name: 'tab' }).state; // marca sessao real
+  state = applyKey(state, { name: 'home' }).state;
+  state = applyKey(state, { name: 'tab' }).state; // marca nova sessao
+  state = applyKey(state, { name: 'return' }).state; // trava
+
+  const result = applyKey(state, { name: 'return' }); // confirma claude (index 0)
+  assert.strictEqual(result.action, 'new-session-batch');
+  assert.strictEqual(result.agent, 'claude');
+  assert.strictEqual(result.items.length, 1, 'a sessao real marcada entra no lote junto');
+});
+
+test('render mostra a linha de nova sessao destacada, e o painel de provedor fica do lado, nao num modal', () => {
   const { createState, applyKey, render } = require('../src/selector');
-  let state = createState(items(3), { viewport: 3, columns: 90, color: false, newSessionAgents: ['claude', 'codex'] });
+  let state = createState(items(3), { viewport: 3, columns: 120, color: false, newSessionAgents: ['claude', 'codex'] });
 
   const lista = render(state);
   assert.ok(lista.includes('> [+] - New session'));
+  assert.ok(lista.includes('pick a provider'), 'painel ja aparece so de estar destacada, antes do Enter');
+  assert.ok(lista.includes('Buscar') || lista.includes('Search'), 'a lista continua visivel ao lado, nao e um modal');
 
   state = applyKey(state, { name: 'return' }).state;
-  const modal = render(state);
-  assert.ok(modal.includes('Which provider?'));
-  assert.ok(modal.includes('> claude'));
-  assert.ok(modal.includes('codex'));
+  const travado = render(state);
+  assert.ok(travado.includes('Choose provider:'));
+  assert.ok(travado.includes('> claude'));
+  assert.ok(travado.includes('codex'));
 });
 
-test('modal de provedor: a borda direita fica na mesma coluna em toda linha, mesmo na colorida', () => {
+test('painel de provedor: o divisor fica na mesma coluna em toda linha, mesmo colorida', () => {
   const { createState, applyKey, render, visibleLength } = require('../src/selector');
-  let state = createState(items(3), { viewport: 3, columns: 90, color: true, newSessionAgents: ['claude', 'codex', 'opencode'] });
+  let state = createState(items(3), { viewport: 3, columns: 120, color: true, newSessionAgents: ['claude', 'codex', 'opencode'] });
   state = applyKey(state, { name: 'return' }).state;
 
   const linhas = render(state)
     .split('\n')
-    .filter((l) => l.includes('│'));
+    .filter((l) => (l.includes('New session') || l.includes('resumo')) && l.includes('│'));
 
-  const posicoes = new Set(linhas.map((l) => visibleLength(l)));
-  assert.strictEqual(posicoes.size, 1, `linhas com largura visivel diferente: ${[...posicoes]}`);
+  const posicoes = new Set(linhas.map((l) => visibleLength(l.slice(0, l.indexOf('│')))));
+  assert.strictEqual(posicoes.size, 1, `divisor em colunas diferentes: ${[...posicoes]}`);
 });
 
-test('modal de provedor fica centralizado na largura do terminal, nao colado na margem esquerda', () => {
+test('terminal estreito demais nao mostra o painel de provedor (sem espaco pras duas colunas)', () => {
+  const { createState, render } = require('../src/selector');
+  const state = createState(items(3), { viewport: 3, columns: 50, color: false, newSessionAgents: ['claude', 'codex'] });
+
+  const out = render(state);
+  assert.ok(!out.includes('pick a provider'));
+});
+
+test('cada provedor no painel usa a mesma cor da marca que a lista principal', () => {
   const { createState, applyKey, render } = require('../src/selector');
   let state = createState(items(3), {
     viewport: 3,
     columns: 120,
-    color: false,
-    newSessionAgents: ['claude', 'codex'],
-  });
-  state = applyKey(state, { name: 'return' }).state;
-
-  const topo = render(state).split('\n').find((l) => l.includes('┌'));
-  const margemEsquerda = topo.length - topo.trimStart().length;
-  assert.ok(margemEsquerda > 10, `esperava margem grande num terminal largo, veio ${margemEsquerda}`);
-});
-
-test('cada provedor no modal usa a mesma cor da marca que a lista principal', () => {
-  const { createState, applyKey, render, ANSI } = require('../src/selector');
-  let state = createState(items(3), {
-    viewport: 3,
-    columns: 90,
     color: true,
     newSessionAgents: ['claude', 'codex', 'opencode'],
   });

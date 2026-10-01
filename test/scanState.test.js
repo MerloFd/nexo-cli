@@ -158,7 +158,7 @@ test('render mostra a tag de confianca, o valor mascarado e as dicas de tecla', 
   const state = createState(rows, { viewport: 5, color: false, columns: 100 });
 
   const out = render(state);
-  assert.ok(out.includes('ALTA'));
+  assert.ok(out.includes('HIGH'));
   assert.ok(out.includes('AKI***AA'));
   assert.ok(out.includes('enter redact'));
 });

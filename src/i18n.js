@@ -71,6 +71,28 @@ const MESSAGES = {
     'usage.approximate.2': 'with the session total only, so they have no daily breakdown.',
     'usage.noMoney.1': 'No money figures: on a subscription plan tokens are not billed per unit,',
     'usage.noMoney.2': 'so any amount shown here would be made up.',
+    'usage.ofTotal': 'of total',
+    'usage.dashboard.backToRange': '[Esc] back to the full range',
+    'usage.dashboard.footer': '[↑↓] move   [Enter] drill into a day   [Tab] day/week   [Esc] quit',
+
+    'ui.confirm.options': '[Enter] No (default)    [S] Yes    [Esc] cancel',
+    'send.target.singular': 'this session about to open',
+    'send.target.plural': 'these {n} sessions about to open',
+    'send.confirm.question': 'Send this message to {alvo}?',
+
+    'scan.tag.alta': 'HIGH',
+    'scan.tag.media': 'MED',
+    'scan.tag.baixa': 'LOW',
+    'scan.lineLabel': 'line {n}',
+    'scan.interactive.header': 'nexo scan ({n} selected)',
+    'scan.interactive.footer': '↑↓ move   tab mark (high-confidence only)   enter redact   esc quit',
+    'scan.interactive.confirmQuestion': 'Redact {n} credential(s)? This rewrites the session file in place.',
+
+    'newSession.row': '[+] - New session',
+    'newSession.panel.titleBrowse': 'New session · pick a provider',
+    'newSession.panel.titleLocked': 'Choose provider:',
+    'newSession.panel.hintBrowse': 'tab mark   enter choose',
+    'newSession.panel.hintLocked': '↑↓ pick   enter confirm   esc cancel',
   },
 
   pt: {
@@ -143,6 +165,28 @@ const MESSAGES = {
     'usage.approximate.2': 'apenas com o total da sessao, sem quebra por dia.',
     'usage.noMoney.1': 'Sem valores em dinheiro: em plano de assinatura o token nao e cobrado',
     'usage.noMoney.2': 'por unidade, entao qualquer cifra aqui seria inventada.',
+    'usage.ofTotal': 'do total',
+    'usage.dashboard.backToRange': '[Esc] volta pro periodo inteiro',
+    'usage.dashboard.footer': '[↑↓] move   [Enter] entra no dia   [Tab] dia/semana   [Esc] sai',
+
+    'ui.confirm.options': '[Enter] Nao (padrao)    [S] Sim    [Esc] cancelar',
+    'send.target.singular': 'essa sessao que vai abrir',
+    'send.target.plural': 'essas {n} sessoes que vao abrir',
+    'send.confirm.question': 'Mandar essa mensagem pra {alvo}?',
+
+    'scan.tag.alta': 'ALTA',
+    'scan.tag.media': 'MEDIA',
+    'scan.tag.baixa': 'BAIXA',
+    'scan.lineLabel': 'linha {n}',
+    'scan.interactive.header': 'nexo scan ({n} selecionado(s))',
+    'scan.interactive.footer': '↑↓ move   tab marca (so alta confianca)   enter redige   esc sai',
+    'scan.interactive.confirmQuestion': 'Apagar {n} credencial(is)? Isso reescreve o arquivo da sessao.',
+
+    'newSession.row': '[+] - Nova sessao',
+    'newSession.panel.titleBrowse': 'Nova sessao · escolha o provedor',
+    'newSession.panel.titleLocked': 'Escolha o provedor:',
+    'newSession.panel.hintBrowse': 'tab marca   enter escolhe',
+    'newSession.panel.hintLocked': '↑↓ escolhe   enter confirma   esc cancela',
   },
 };
 

@@ -80,7 +80,8 @@ function tabela(linhas, { titulo, ordenarPorChave = false, limite = 0, grandTota
     const rotulo = encurtar(String(linha.key), largura).padEnd(largura);
     const valor = human(linha.total).padStart(6);
     const barra = bar(linha.total, max).padEnd(25);
-    const pct = grandTotal > 0 ? `  ${`${Math.round((linha.total / grandTotal) * 100)}%`.padStart(4)} of total` : '';
+    const pct =
+      grandTotal > 0 ? `  ${`${Math.round((linha.total / grandTotal) * 100)}%`.padStart(4)} ${t('usage.ofTotal')}` : '';
     out.push(`  ${rotulo}  ${valor}  ${barra}${pct}`.trimEnd());
   }
 

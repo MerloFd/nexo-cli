@@ -115,7 +115,8 @@ function renderRows(state, rows, grandTotal) {
     const selecionado = i === state.index;
     const marcador = selecionado ? '> ' : '  ';
     const barra = bar(r.total, max).padEnd(25);
-    const pct = grandTotal > 0 ? `  ${`${Math.round((r.total / grandTotal) * 100)}%`.padStart(4)} of total` : '';
+    const pct =
+      grandTotal > 0 ? `  ${`${Math.round((r.total / grandTotal) * 100)}%`.padStart(4)} ${t('usage.ofTotal')}` : '';
     const linha = `${marcador}${String(r.key).padEnd(12)}  ${human(r.total).padStart(6)}  ${barra}${pct}`.trimEnd();
     linhas.push(selecionado ? paint(state, ANSI.bold + ANSI.cyan, linha) : linha);
     linhas.push(''); // respiro entre linhas - sem isso as barras ficavam coladas umas nas outras
@@ -140,7 +141,7 @@ function renderDrill(state) {
     ...tabela(agrupar(escopo, (s) => s.agent), { titulo: t('usage.byAgent'), grandTotal }),
     ...tabela(agrupar(escopo, (s) => s.model), { titulo: t('usage.byModel'), grandTotal }),
     ...tabela(agrupar(escopo, (s) => s.dir), { titulo: t('usage.byProject'), limite: 10, grandTotal }),
-    paint(state, ANSI.dim, '  [Esc] back to the full range'),
+    paint(state, ANSI.dim, `  ${t('usage.dashboard.backToRange')}`),
   ];
 
   return linhas.join('\n');
@@ -169,13 +170,7 @@ function renderDashboard(state) {
   }
 
   linhas.push('');
-  linhas.push(
-    paint(
-      state,
-      ANSI.dim,
-      '  [↑↓] move   [Enter] drill into a day   [Tab] day/week   [Esc] quit'
-    )
-  );
+  linhas.push(paint(state, ANSI.dim, `  ${t('usage.dashboard.footer')}`));
 
   return linhas.join('\n');
 }

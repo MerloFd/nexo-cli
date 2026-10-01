@@ -130,14 +130,14 @@ function paint(state, code, text) {
 }
 
 const CONFIDENCE_COLOR = { alta: ANSI.red, media: ANSI.yellow, baixa: ANSI.dim };
-const CONFIDENCE_TAG = { alta: 'ALTA', media: 'MEDIA', baixa: 'BAIXA' };
+const CONFIDENCE_TAG = { alta: 'scan.tag.alta', media: 'scan.tag.media', baixa: 'scan.tag.baixa' };
 
 function renderRow(state, row, selecionado) {
   const marcador = state.marked.has(row.key) ? '✓ ' : selecionado ? '> ' : '  ';
-  const tag = paint(state, CONFIDENCE_COLOR[row.confidence], CONFIDENCE_TAG[row.confidence].padEnd(5));
+  const tag = paint(state, CONFIDENCE_COLOR[row.confidence], t(CONFIDENCE_TAG[row.confidence]).padEnd(5));
   const vezes = row.occurrences > 1 ? ` (${row.occurrences}x)` : '';
   const texto = `${marcador}${tag}  ${row.label.padEnd(28)}  ${row.masked.padEnd(14)}${vezes}`.trimEnd();
-  const meta = `      ${row.agent} · ${row.title} · linha ${row.firstLine}`;
+  const meta = `      ${row.agent} · ${row.title} · ${t('scan.lineLabel', { n: row.firstLine })}`;
 
   if (!selecionado) return [texto, paint(state, ANSI.dim, meta)];
   return [paint(state, ANSI.bold + ANSI.cyan, texto), paint(state, ANSI.white, meta)];
@@ -145,11 +145,7 @@ function renderRow(state, row, selecionado) {
 
 function renderConfirm(state) {
   const n = state.confirmRedact.keys.length;
-  const linhas = [
-    `Redact ${n} credential${n === 1 ? '' : 's'}? This rewrites the session file in place.`,
-    '',
-    '[Enter] No (default)    [S] Yes    [Esc] cancel',
-  ];
+  const linhas = [t('scan.interactive.confirmQuestion', { n }), '', t('ui.confirm.options')];
   const largura = Math.min(Math.max(...linhas.map((l) => l.length)) + 4, Math.max(20, state.columns - 4));
   const corpo = linhas.map((l) => `  │ ${l.padEnd(largura - 2)} │`);
 
@@ -166,26 +162,20 @@ function render(state) {
   if (state.confirmRedact) return renderConfirm(state);
 
   const { rows, index, offset, viewport, marked } = state;
-  const lines = ['', paint(state, ANSI.bold, `  nexo scan (${marked.size} selected)`), ''];
+  const lines = ['', paint(state, ANSI.bold, `  ${t('scan.interactive.header', { n: marked.size })}`), ''];
 
   if (rows.length === 0) {
     lines.push(paint(state, ANSI.dim, `  ${t('scan.clean')}`));
   } else {
-    if (offset > 0) lines.push(paint(state, ANSI.dim, `  ↑ ${offset} above`));
+    if (offset > 0) lines.push(paint(state, ANSI.dim, '  ' + t('ui.scroll.up', { n: offset })));
     const end = Math.min(offset + viewport, rows.length);
     for (let i = offset; i < end; i++) lines.push(...renderRow(state, rows[i], i === index));
     const abaixo = rows.length - end;
-    if (abaixo > 0) lines.push(paint(state, ANSI.dim, `  ↓ ${abaixo} below`));
+    if (abaixo > 0) lines.push(paint(state, ANSI.dim, '  ' + t('ui.scroll.down', { n: abaixo })));
   }
 
   lines.push('');
-  lines.push(
-    paint(
-      state,
-      ANSI.dim,
-      '  ↑↓ move   tab mark (high-confidence only)   enter redact   esc quit'
-    )
-  );
+  lines.push(paint(state, ANSI.dim, `  ${t('scan.interactive.footer')}`));
 
   return lines.join('\n');
 }

@@ -50,7 +50,7 @@ function imprimirGrupo(results, confidence, titulo, nota) {
 
     for (const f of result.findings) {
       const vezes = f.occurrences > 1 ? ` (${f.occurrences}x)` : '';
-      console.log(`      ${f.label}: ${f.masked}${vezes}  linha ${f.firstLine}`);
+      console.log(`      ${f.label}: ${f.masked}${vezes}  ${t('scan.lineLabel', { n: f.firstLine })}`);
     }
 
     console.log(`    ${result.filePath}`);

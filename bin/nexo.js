@@ -162,15 +162,11 @@ async function main() {
 
   const { chosen, batch, sendText, newSessionAgent } = await pickSession(sessions, { sendPrompt: flags.send });
 
-  if (newSessionAgent) {
-    reportNewSession(newSessionAgent);
-    if (primeiraVez) console.log(t('cli.langHint'));
-    return;
-  }
-
   // O lote (Tab pra marcar, Enter pra abrir tudo de uma vez) so existe depois
   // que o seletor fecha, porque a tela estava em modo alternativo ate agora;
-  // o relatorio so sai aqui.
+  // o relatorio so sai aqui. Quando ha uma sessao nova junto, ela sempre
+  // abre por ultimo (depois deste loop) - e por isso que o relatorio dela
+  // tambem sai so depois, nunca antes do lote.
   for (const entry of batch) {
     entry.failures.forEach((f) => console.error(t('cli.warning', { message: f })));
     if (entry.backend) {
@@ -185,6 +181,12 @@ async function main() {
     if (entry.sendRequested && !entry.sendSupported) {
       console.log(t('cli.sendUnsupported', { backend: entry.backend }));
     }
+  }
+
+  if (newSessionAgent) {
+    reportNewSession(newSessionAgent);
+    if (primeiraVez) console.log(t('cli.langHint'));
+    return;
   }
 
   if (!chosen) {

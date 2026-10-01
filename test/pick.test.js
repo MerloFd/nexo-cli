@@ -96,6 +96,25 @@ test('com --send, cada sessao do lote recebe o mesmo texto pra mandar', (t) => {
   ]);
 });
 
+test('openNewSessionBatch: toda sessao real abre em segundo plano, sem excecao', (t) => {
+  const chamadas = [];
+  t.mock.method(backends, 'openSession', (session, _backends, opts) => {
+    chamadas.push({ id: session.sessionId, background: Boolean(opts && opts.background) });
+    return { backend: 'fake', failures: [] };
+  });
+
+  delete require.cache[require.resolve('../src/pick')];
+  const { openNewSessionBatch } = require('../src/pick');
+
+  openNewSessionBatch([{ sessionId: 'a' }, { sessionId: 'b' }, { sessionId: 'c' }]);
+
+  assert.deepStrictEqual(chamadas, [
+    { id: 'a', background: true },
+    { id: 'b', background: true },
+    { id: 'c', background: true },
+  ]);
+});
+
 test('sem --send, sendText vai null - nenhum backend tenta mandar nada', (t) => {
   const chamadas = [];
   t.mock.method(backends, 'openSession', (session, _backends, opts) => {
