@@ -10,6 +10,15 @@ const HOME = '\x1b[H';
 const CLEAR_LINE = '\x1b[K'; // apaga da posicao do cursor ate o FIM da linha atual
 const CLEAR_TO_END = '\x1b[0J'; // apaga da posicao do cursor ate o fim da TELA
 
+// "Synchronized output" (suportado por Windows Terminal, iTerm2, kitty,
+// WezTerm): avisa o terminal pra guardar tudo que chegar entre esses dois
+// codigos e pintar de uma vez so, no final, em vez de ir repintando
+// conforme os bytes chegam. Terminal que nao conhece esse modo privado
+// simplesmente ignora os dois codigos (nao quebra nada) - de graca pra quem
+// suporta, inofensivo pra quem nao suporta.
+const SYNC_START = '\x1b[?2026h';
+const SYNC_END = '\x1b[?2026l';
+
 // Apagar a tela inteira antes de redesenhar ("\x1b[H\x1b[2J") pisca em
 // console de verdade - fica um instante em branco entre apagar e reescrever
 // (confirmado no PowerShell classico; o Herdr nao mostra porque le o stream
@@ -22,7 +31,8 @@ const CLEAR_TO_END = '\x1b[0J'; // apaga da posicao do cursor ate o fim da TELA
 // quebra, apagando so o resto daquela linha especifica. "\x1b[0J" no final
 // cobre o caso do frame novo ter menos LINHAS no total que o anterior.
 function frame(text) {
-  return HOME + text.split('\n').join(`${CLEAR_LINE}\n`) + CLEAR_LINE + CLEAR_TO_END;
+  const corpo = HOME + text.split('\n').join(`${CLEAR_LINE}\n`) + CLEAR_LINE + CLEAR_TO_END;
+  return SYNC_START + corpo + SYNC_END;
 }
 
 module.exports = { ALT_SCREEN_ON, ALT_SCREEN_OFF, CURSOR_HIDE, CURSOR_SHOW, frame };

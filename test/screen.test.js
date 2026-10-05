@@ -5,7 +5,7 @@ const { frame, ALT_SCREEN_ON, ALT_SCREEN_OFF, CURSOR_HIDE, CURSOR_SHOW } = requi
 
 test('frame volta o cursor pro topo sem apagar a tela inteira primeiro', () => {
   const out = frame('linha 1\nlinha 2');
-  assert.ok(out.startsWith('\x1b[H'), 'comeca voltando o cursor, nunca com \\x1b[2J (apaga tudo)');
+  assert.ok(out.includes('\x1b[H'), 'volta o cursor pro topo em algum momento, nunca com \\x1b[2J (apaga tudo)');
   assert.ok(!out.includes('\x1b[2J'), 'nao apaga a tela inteira - isso que causava o pisca-pisca');
 });
 
@@ -24,7 +24,13 @@ test('frame fecha CADA linha com erase-to-end-of-line, nao so o fim da tela', ()
 
 test('frame termina com erase-to-end-of-screen, pro frame novo poder ter menos linhas que o anterior', () => {
   const out = frame('so uma linha');
-  assert.ok(out.endsWith('\x1b[0J'), 'ultimo codigo e sempre o clear-to-end da tela');
+  assert.ok(out.includes('\x1b[0J'), 'tem o clear-to-end da tela em algum momento');
+});
+
+test('frame inteiro vem embrulhado em synchronized output (inofensivo em quem nao suporta)', () => {
+  const out = frame('linha 1\nlinha 2');
+  assert.ok(out.startsWith('\x1b[?2026h'), 'avisa o terminal antes de mandar qualquer coisa');
+  assert.ok(out.endsWith('\x1b[?2026l'), 'fecha o aviso depois de tudo, inclusive o clear-to-end');
 });
 
 test('ALT_SCREEN e CURSOR continuam exportados do modulo compartilhado', () => {

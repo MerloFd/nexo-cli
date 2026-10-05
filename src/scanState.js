@@ -147,9 +147,13 @@ function renderRow(state, row, selecionado) {
   // Linha selecionada vira barra inteira (reverse video) - precisa montar o
   // texto PLANO primeiro (tag sem cor propria ainda) pra padEnd ir ate a
   // borda antes de pintar, senao a barra para onde o texto acaba.
+  // bold junto com reverse muda de tom em muitos terminais - as duas linhas
+  // usam o mesmo par de codigos, senao a mesma sessao saia com duas cores
+  // diferentes (visto ao vivo no PowerShell).
+  const corDestaque = ANSI.reverse + ANSI.cyan;
   const textoPlano = `${marcador}${tagPlano}  ${row.label.padEnd(28)}  ${row.masked.padEnd(14)}${vezes}`.trimEnd();
-  const texto = paint(state, ANSI.reverse + ANSI.bold + ANSI.cyan, padVisible(state, textoPlano, state.columns));
-  const meta = paint(state, ANSI.reverse + ANSI.cyan, padVisible(state, metaPlano, state.columns));
+  const texto = paint(state, corDestaque, padVisible(state, textoPlano, state.columns));
+  const meta = paint(state, corDestaque, padVisible(state, metaPlano, state.columns));
   return [texto, meta];
 }
 

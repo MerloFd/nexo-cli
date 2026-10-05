@@ -142,7 +142,7 @@ test('render marca a linha selecionada e respeita a largura', () => {
   const lines = render(state).split('\n');
   lines.forEach((line) => assert.ok(line.length <= 80, `linha excede 80 colunas: ${line}`));
 
-  const marked = lines.filter((l) => l.includes('│❯ '));
+  const marked = lines.filter((l) => l.includes('│» '));
   assert.strictEqual(marked.length, 1);
   assert.ok(marked[0].includes('resumo da sessao 1'));
 });
@@ -185,7 +185,7 @@ test('cada sessao ocupa duas linhas: rotulo em cima, metadados embaixo', () => {
   const meta = lines.find((l) => l.includes('claude'));
   const metaSemBorda = meta.replace(/^\s*│/, '').replace(/│\s*$/, '').trim();
 
-  assert.ok(head.includes('│❯ '), 'a primeira linha traz o marcador e o rotulo');
+  assert.ok(head.includes('│» '), 'a primeira linha traz o marcador e o rotulo');
   assert.deepStrictEqual(metaSemBorda.split(' \u00b7 '), [
     'claude',
     'C:\\DEV',
@@ -278,7 +278,7 @@ test('check some quando o item marcado esta selecionado', () => {
   const linhas = render(state).split('\n');
   const atual = linhas.find((l) => l.includes('resumo da sessao 0'));
 
-  assert.ok(atual.includes('│❯ '), 'selecao tem prioridade visual sobre o check');
+  assert.ok(atual.includes('│» '), 'selecao tem prioridade visual sobre o check');
 });
 
 test('Tab so marca e avanca - nao abre nada', () => {
@@ -576,14 +576,14 @@ test('render mostra a linha de nova sessao destacada, e o painel de provedor fic
   let state = createState(items(3), { viewport: 3, columns: 120, color: false, newSessionAgents: ['claude', 'codex'] });
 
   const lista = render(state);
-  assert.ok(lista.includes('❯ [+] - New session'));
+  assert.ok(lista.includes('» [+] - New session'));
   assert.ok(lista.includes('pick a provider'), 'painel ja aparece so de estar destacada, antes do Enter');
   assert.ok(lista.includes('Buscar') || lista.includes('Search'), 'a lista continua visivel ao lado, nao e um modal');
 
   state = applyKey(state, { name: 'return' }).state;
   const travado = render(state);
   assert.ok(travado.includes('Choose provider:'));
-  assert.ok(travado.includes('❯ claude'));
+  assert.ok(travado.includes('» claude'));
   assert.ok(travado.includes('codex'));
 });
 
@@ -896,8 +896,11 @@ test('na linha selecionada, titulo e path saem no mesmo bloco de cor', () => {
   const state = createState(items(2), { viewport: 2, columns: 90, color: true });
   const linhas = render(state).split('\n');
 
-  const selecionada = linhas.find((l) => l.includes('❯ resumo'));
-  assert.ok(selecionada.includes(ANSI.bold + ANSI.cyan), 'titulo e path selecionados usam a mesma cor');
+  const selecionada = linhas.find((l) => l.includes('» resumo'));
+  // Sem bold de proposito: junto com reverse, bold muda de tom em muitos
+  // terminais - titulo e subtitulo precisam do MESMO par de codigos, senao
+  // a mesma sessao sai com duas cores diferentes (bug real, visto ao vivo).
+  assert.ok(selecionada.includes(ANSI.reverse + ANSI.cyan), 'titulo e path selecionados usam a mesma cor');
 });
 
 test('linha selecionada vira uma barra inteira (reverse video), nao campos coloridos um a um', () => {
@@ -917,6 +920,22 @@ test('linha selecionada vira uma barra inteira (reverse video), nao campos color
 
   assert.ok(meta.includes(ANSI.reverse), 'a linha toda vira barra, nao so o texto');
   assert.ok(!meta.includes(ANSI.dim), 'nao sobra dim na linha destacada');
+});
+
+test('titulo e subtitulo da linha selecionada usam o MESMO codigo de cor (bold sozinho muda o tom sob reverse)', () => {
+  const item = { dir: 'C:\\DEV', sessionId: 'id1', agent: 'claude', age: '3d atras', mtime: Date.now(), summary: 's' };
+  const state = createState([item], { viewport: 1, columns: 90, color: true });
+  const linhas = render(state).split('\n');
+
+  const head = linhas.find((l) => l.includes('»'));
+  const meta = linhas.find((l) => l.includes('claude'));
+  const corPrefixo = (linha) => linha.match(/(\x1b\[[0-9;]*m)+/)[0];
+
+  assert.strictEqual(
+    corPrefixo(head),
+    corPrefixo(meta),
+    'mesma sessao nao pode sair com uma cor no titulo e outra no subtitulo'
+  );
 });
 
 test('fora da selecao, a idade mantem a propria cor gradiente de sempre', () => {

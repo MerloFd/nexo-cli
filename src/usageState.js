@@ -119,12 +119,9 @@ function renderRows(state, rows, grandTotal) {
       grandTotal > 0 ? `  ${`${Math.round((r.total / grandTotal) * 100)}%`.padStart(4)} ${t('usage.ofTotal')}` : '';
     const linha = `${marcador}${String(r.key).padEnd(12)}  ${human(r.total).padStart(6)}  ${barra}${pct}`.trimEnd();
     // Linha selecionada vira barra inteira (reverse video), ate a borda do
-    // terminal - mesmo truque do selector.js e do scanState.js.
-    linhas.push(
-      selecionado
-        ? paint(state, ANSI.reverse + ANSI.bold + ANSI.cyan, padVisible(state, linha, state.columns))
-        : linha
-    );
+    // terminal - mesmo truque do selector.js e do scanState.js. Sem bold:
+    // junto com reverse, bold muda de tom em muitos terminais.
+    linhas.push(selecionado ? paint(state, ANSI.reverse + ANSI.cyan, padVisible(state, linha, state.columns)) : linha);
     linhas.push(''); // respiro entre linhas - sem isso as barras ficavam coladas umas nas outras
   }
 

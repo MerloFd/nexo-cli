@@ -93,7 +93,7 @@ test('renderDashboard mostra a linha destacada e as dicas de tecla', () => {
 
   assert.ok(out.includes('2026-09-20'));
   assert.ok(out.includes('2026-09-21'));
-  assert.ok(out.includes('❯ '), 'a primeira linha comeca destacada');
+  assert.ok(out.includes('» '), 'a primeira linha comeca destacada');
   assert.ok(out.includes('drill into a day'));
 });
 
@@ -102,7 +102,7 @@ test('linha destacada vira barra inteira (reverse video)', () => {
   const state = createState(SAMPLES, { periodo: 'dia', color: true, columns: 100 });
   const out = renderDashboard(state);
 
-  const selecionada = out.split('\n').find((l) => l.includes('❯ '));
+  const selecionada = out.split('\n').find((l) => l.includes('» '));
   assert.ok(selecionada.includes(ANSI.reverse), 'a linha toda vira barra, nao so o texto');
 });
 

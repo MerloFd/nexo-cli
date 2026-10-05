@@ -83,7 +83,7 @@ In the list:
   └────────────────────────────────────────────────────┘
 
   ┌──────────────────────────────────────────────────────────────┐
-  │❯ Session switcher tool                                        │
+  │» Session switcher tool                                        │
   │    claude · C:\DEV\nexo-cli · now  · HEAD · 3.5MB · 323k ctx  │
   │  FIX RECURRENCES                                              │
   │    codex  · C:\DEV\SO5      · 2d ago · frete-refactor         │
@@ -178,7 +178,7 @@ preview of the highlighted session's conversation is on by default whenever
 the terminal is at least 116 columns wide; **Ctrl+T** toggles it off:
 
 ```
-❯ Fits (Melhorias)                                    │ claude · Fits (Melhorias)
+» Fits (Melhorias)                                    │ claude · Fits (Melhorias)
     claude · C:\DEV\SO5 · 1221 turns · 1h ago · HEAD   │ C:\DEV\SistemasAtuais\SO5 · 1h ago
   FIX GERENCIADOR CARDS COM SPEC                       │
     claude · C:\DEV\SO5 · 542 turns · 1h ago · HEAD    │ > eu tenho o spec-kit instalado...
@@ -260,7 +260,7 @@ high-confidence findings selectable:
 ```
   nexo scan (0 selected)
 
-❯ ALTA   AWS access key                AKI********QQ
+» ALTA   AWS access key                AKI********QQ
       claude · Templates for EN · linha 1292
   ALTA   Token do GitHub               ghp********ZZ  (4x)
       claude · FIX RECURRENCES · linha 8885
@@ -349,7 +349,7 @@ Total: 8.2B tokens across 22827 turns
 
 By day
 
-❯ 2026-09-28      1.2B  █████████████▋              14% of total
+» 2026-09-28      1.2B  █████████████▋              14% of total
   2026-09-29    410.9M  ████▊                        5% of total
   ↓ 24 below
 
