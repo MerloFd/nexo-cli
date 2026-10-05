@@ -1,11 +1,6 @@
 const readline = require('readline');
 const { createState, applyKey, renderDashboard, syncOffset, rowsFor } = require('../usageState');
-
-const ALT_SCREEN_ON = '\x1b[?1049h';
-const ALT_SCREEN_OFF = '\x1b[?1049l';
-const CURSOR_HIDE = '\x1b[?25l';
-const CURSOR_SHOW = '\x1b[?25h';
-const CLEAR = '\x1b[H\x1b[2J';
+const { ALT_SCREEN_ON, ALT_SCREEN_OFF, CURSOR_HIDE, CURSOR_SHOW, frame } = require('../screen');
 
 // Resumo (~7 linhas) + titulo do bloco de dias (2) + espacos e rodape (3) -
 // linhas fixas fora da lista navegavel. Cada linha de dia/semana ocupa DUAS
@@ -35,7 +30,7 @@ function runDashboard(samples, { periodo = 'dia' } = {}) {
     process.stdin.resume();
     out.write(ALT_SCREEN_ON + CURSOR_HIDE);
 
-    const draw = () => out.write(CLEAR + renderDashboard(state));
+    const draw = () => out.write(frame(renderDashboard(state)));
     draw();
 
     const onResize = () => {

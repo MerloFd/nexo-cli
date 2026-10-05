@@ -1,12 +1,7 @@
 const readline = require('readline');
 const { flattenFindings, createState, applyKey, render } = require('../scanState');
 const { redactFile, isPossiblyActive } = require('./redact');
-
-const ALT_SCREEN_ON = '\x1b[?1049h';
-const ALT_SCREEN_OFF = '\x1b[?1049l';
-const CURSOR_HIDE = '\x1b[?25l';
-const CURSOR_SHOW = '\x1b[?25h';
-const CLEAR = '\x1b[H\x1b[2J';
+const { ALT_SCREEN_ON, ALT_SCREEN_OFF, CURSOR_HIDE, CURSOR_SHOW, frame } = require('../screen');
 
 // Cabecalho (3) + rodape (3) fixos fora da lista navegavel, e cada achado
 // ocupa DUAS linhas de tela (texto + meta), igual a lista de sessoes - sem
@@ -71,7 +66,7 @@ function runInteractiveScan(results) {
     process.stdin.resume();
     out.write(ALT_SCREEN_ON + CURSOR_HIDE);
 
-    const draw = () => out.write(CLEAR + render(state));
+    const draw = () => out.write(frame(render(state)));
     draw();
 
     const onResize = () => {

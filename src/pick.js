@@ -7,11 +7,7 @@ const { openSession } = require('./backends');
 const { loadPreview } = require('./preview');
 const { AGENTS } = require('./agents');
 
-const ALT_SCREEN_ON = '\x1b[?1049h';
-const ALT_SCREEN_OFF = '\x1b[?1049l';
-const CURSOR_HIDE = '\x1b[?25l';
-const CURSOR_SHOW = '\x1b[?25h';
-const CLEAR = '\x1b[H\x1b[2J';
+const { ALT_SCREEN_ON, ALT_SCREEN_OFF, CURSOR_HIDE, CURSOR_SHOW, frame } = require('./screen');
 
 function toRows(sessions) {
   return sessions.map((s) => ({
@@ -132,7 +128,7 @@ function pickInteractive(sessions, { sendPrompt = null } = {}) {
     process.stdin.resume();
     out.write(ALT_SCREEN_ON + CURSOR_HIDE);
 
-    const draw = () => out.write(CLEAR + render(state, previewLines));
+    const draw = () => out.write(frame(render(state, previewLines)));
     draw();
 
     const onResize = () => {
