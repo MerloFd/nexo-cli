@@ -97,13 +97,13 @@ test('renderDashboard mostra a linha destacada e as dicas de tecla', () => {
   assert.ok(out.includes('drill into a day'));
 });
 
-test('linha destacada vira barra inteira (reverse video)', () => {
-  const { ANSI } = require('../src/selector');
+test('linha destacada vira barra inteira', () => {
+  const { HIGHLIGHT } = require('../src/selector');
   const state = createState(SAMPLES, { periodo: 'dia', color: true, columns: 100 });
   const out = renderDashboard(state);
 
   const selecionada = out.split('\n').find((l) => l.includes('» '));
-  assert.ok(selecionada.includes(ANSI.reverse), 'a linha toda vira barra, nao so o texto');
+  assert.ok(selecionada.includes(HIGHLIGHT), 'a linha toda vira barra, nao so o texto');
 });
 
 test('renderDashboard mostra o percentual de cada dia em relacao ao total geral, nao so a barra relativa', () => {

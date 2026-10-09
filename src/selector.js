@@ -11,7 +11,15 @@ const ANSI = {
   white: '\x1b[97m',
   red: '\x1b[31m',
   reverse: '\x1b[7m',
+  // Fundo cinza bem fraco (nao reverse video) pra linha selecionada - cor
+  // fixa escolhida direto, sem depender do fundo/frente que o terminal ja
+  // usa. Texto branco por cima pra garantir contraste nesse fundo especifico.
+  highlightBg: '\x1b[48;2;58;58;58m',
 };
+
+// Combo unico pra linha destacada (sessao, achado de scan, dia do usage) -
+// um lugar so pra mudar o visual da selecao em todo canto de uma vez.
+const HIGHLIGHT = ANSI.highlightBg + ANSI.white;
 
 // "❯" (bloco Dingbats) causava flicker ao navegar: fonte de codigo que nao
 // tem esse glifo faz o terminal buscar ele em outra fonte (font fallback),
@@ -492,18 +500,12 @@ function renderItem(state, item, selected, widths) {
   }
 
   // Linha selecionada vira uma barra inteira, nao so o texto colorido -
-  // "reverse video" troca frente/fundo que o terminal ja usa, entao funciona
-  // certo em tema claro ou escuro sem chutar uma cor de fundo fixa (mesmo
-  // truque que fzf/lazygit usam). padVisible preenche ate a borda da linha
-  // ANTES de pintar - senao a barra para onde o texto acaba, nao na borda.
-  // bold junto com reverse muda de tom em muitos terminais (o bold vira "cor
-  // brilhante" por baixo, trocando o fundo do reverse) - com bold so no
-  // titulo e nao no subtitulo, a mesma sessao saia com duas cores diferentes
-  // (visto ao vivo no PowerShell). As duas linhas usam o mesmo par de
-  // codigos agora, de proposito.
-  const corDestaque = ANSI.reverse + ANSI.cyan;
-  const head = paint(state, corDestaque, padVisible(state, headTexto, state.columns));
-  const meta = paint(state, corDestaque, padVisible(state, metaTexto, state.columns));
+  // padVisible preenche ate a borda da linha ANTES de pintar, senao a barra
+  // para onde o texto acaba, nao na borda. Titulo e subtitulo usam o MESMO
+  // combo (ver HIGHLIGHT) - misturar codigos diferentes entre as duas linhas
+  // da mesma sessao ja causou elas saindo com tons diferentes antes.
+  const head = paint(state, HIGHLIGHT, padVisible(state, headTexto, state.columns));
+  const meta = paint(state, HIGHLIGHT, padVisible(state, metaTexto, state.columns));
   return [head, meta];
 }
 
@@ -827,4 +829,5 @@ module.exports = {
   visibleLength,
   padVisible,
   MARKER_SELECTED,
+  HIGHLIGHT,
 };

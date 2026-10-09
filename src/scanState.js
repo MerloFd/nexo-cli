@@ -1,7 +1,7 @@
 // Estado e render puros da tela interativa do "nexo scan" - mesma separacao
 // do selector.js: nada aqui toca arquivo, terminal ou I/O. O loop de teclado
 // e a redacao de verdade ficam em src/scan/interactive.js.
-const { ANSI, MARKER_SELECTED, padVisible } = require('./selector');
+const { ANSI, MARKER_SELECTED, padVisible, HIGHLIGHT } = require('./selector');
 const { t } = require('./i18n');
 
 // So achado de alta confianca numa sessao do Claude entra na lista
@@ -144,16 +144,13 @@ function renderRow(state, row, selecionado) {
     return [texto, paint(state, ANSI.dim, metaPlano)];
   }
 
-  // Linha selecionada vira barra inteira (reverse video) - precisa montar o
-  // texto PLANO primeiro (tag sem cor propria ainda) pra padEnd ir ate a
-  // borda antes de pintar, senao a barra para onde o texto acaba.
-  // bold junto com reverse muda de tom em muitos terminais - as duas linhas
-  // usam o mesmo par de codigos, senao a mesma sessao saia com duas cores
-  // diferentes (visto ao vivo no PowerShell).
-  const corDestaque = ANSI.reverse + ANSI.cyan;
+  // Linha selecionada vira barra inteira - precisa montar o texto PLANO
+  // primeiro (tag sem cor propria ainda) pra padEnd ir ate a borda antes de
+  // pintar, senao a barra para onde o texto acaba. Mesmo HIGHLIGHT do
+  // selector.js nas duas linhas, de proposito.
   const textoPlano = `${marcador}${tagPlano}  ${row.label.padEnd(28)}  ${row.masked.padEnd(14)}${vezes}`.trimEnd();
-  const texto = paint(state, corDestaque, padVisible(state, textoPlano, state.columns));
-  const meta = paint(state, corDestaque, padVisible(state, metaPlano, state.columns));
+  const texto = paint(state, HIGHLIGHT, padVisible(state, textoPlano, state.columns));
+  const meta = paint(state, HIGHLIGHT, padVisible(state, metaPlano, state.columns));
   return [texto, meta];
 }
 

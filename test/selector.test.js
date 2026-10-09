@@ -4,7 +4,7 @@ const assert = require('node:assert');
 // Fixa o idioma: sem isso a suite quebraria conforme a preferencia da maquina.
 process.env.NEXO_LANG = 'en';
 
-const { createState, applyKey, render, ANSI } = require('../src/selector');
+const { createState, applyKey, render, ANSI, HIGHLIGHT } = require('../src/selector');
 
 function items(n) {
   return Array.from({ length: n }, (_, i) => {
@@ -695,7 +695,7 @@ test('linha que precisa truncar cai de volta no dim uniforme, sem quebrar cor', 
   // ANSI pela metade (o que corromperia o resto do terminal).
   const meta = linhas.find((l) => l.includes('claude'));
   assert.ok(meta);
-  const semCores = meta.replace(/\x1b\[[0-9]*m/g, '');
+  const semCores = meta.replace(/\x1b\[[0-9;]*m/g, '');
   assert.ok(semCores.length <= 30, `linha visivel excede a largura: "${semCores}" (${semCores.length})`);
 });
 
@@ -897,13 +897,10 @@ test('na linha selecionada, titulo e path saem no mesmo bloco de cor', () => {
   const linhas = render(state).split('\n');
 
   const selecionada = linhas.find((l) => l.includes('» resumo'));
-  // Sem bold de proposito: junto com reverse, bold muda de tom em muitos
-  // terminais - titulo e subtitulo precisam do MESMO par de codigos, senao
-  // a mesma sessao sai com duas cores diferentes (bug real, visto ao vivo).
-  assert.ok(selecionada.includes(ANSI.reverse + ANSI.cyan), 'titulo e path selecionados usam a mesma cor');
+  assert.ok(selecionada.includes(HIGHLIGHT), 'titulo e path selecionados usam a mesma cor');
 });
 
-test('linha selecionada vira uma barra inteira (reverse video), nao campos coloridos um a um', () => {
+test('linha selecionada vira uma barra inteira, nao campos coloridos um a um', () => {
   const item = {
     dir: 'C:\\DEV',
     sessionId: 'id1',
@@ -918,7 +915,7 @@ test('linha selecionada vira uma barra inteira (reverse video), nao campos color
   const state = createState([item], { viewport: 1, columns: 90, color: true });
   const meta = render(state).split('\n').find((l) => l.includes('claude'));
 
-  assert.ok(meta.includes(ANSI.reverse), 'a linha toda vira barra, nao so o texto');
+  assert.ok(meta.includes(HIGHLIGHT), 'a linha toda vira barra, nao so o texto');
   assert.ok(!meta.includes(ANSI.dim), 'nao sobra dim na linha destacada');
 });
 
