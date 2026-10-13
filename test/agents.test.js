@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { AGENTS, byId, resumeArgs, newSessionArgs } = require('../src/agents');
+const { AGENTS, byId, resumeArgs } = require('../src/agents');
 
 test('AGENTS lista claude, codex e opencode', () => {
   assert.deepStrictEqual(AGENTS.map((a) => a.id).sort(), ['claude', 'codex', 'opencode']);
@@ -21,12 +21,3 @@ test('resumeArgs falha claro com agente desconhecido, em vez de chutar um comand
   assert.throws(() => resumeArgs({ agent: 'inexistente', sessionId: 'x' }), /desconhecido/);
 });
 
-test('newSessionArgs e so o nome do CLI - sem flag nenhuma ja comeca do zero', () => {
-  assert.deepStrictEqual(newSessionArgs('claude'), ['claude']);
-  assert.deepStrictEqual(newSessionArgs('codex'), ['codex']);
-  assert.deepStrictEqual(newSessionArgs('opencode'), ['opencode']);
-});
-
-test('newSessionArgs falha com agente desconhecido', () => {
-  assert.throws(() => newSessionArgs('inexistente'), /desconhecido/);
-});

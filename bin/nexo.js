@@ -2,10 +2,9 @@
 const { daysAgo } = require('../src/scanSessions');
 const { scanAll } = require('../src/agents');
 const { pickSession, printPlainList } = require('../src/pick');
-const { openSession, openNewSession } = require('../src/backends');
+const { openSession } = require('../src/backends');
 const { filterItems } = require('../src/selector');
 const { t } = require('../src/i18n');
-const { isFirstRun } = require('../src/config');
 
 const HELP = `nexo - sessions from terminal AI agents, all in one place
 
@@ -14,7 +13,6 @@ Usage:
   nexo <term>         open the list already filtered
   nexo scan           look for credentials leaked into the session logs
   nexo usage          token usage overview
-  nexo lang [en|pt]   show or change the interface language
   nexo --help         this help
 
 Options:
@@ -23,18 +21,18 @@ Options:
   --redact            in scan, remove high-confidence secrets (Claude only)
   --week              in usage, group by week instead of day
   --open <id>         open that session directly (a prefix is enough)
-  --send <text>       ask to send this text to every session you open (Herdr only)
+  --send <text>       ask to send this text to every session you open (Herdr, tmux, WezTerm, kitty)
 
 In the list:
   type                searches right away, no prefix needed
   arrows, ctrl+p/n    move
   ctrl+a              switch between every folder and the current one
-  enter               open the session (the first row starts a new one instead)
+  enter               open the session
   tab                 mark the session (repeat on more), enter opens them all
   esc                 clears the search; with it empty, quits
 `;
 
-const COMMANDS = new Set(['scan', 'usage', 'lang']);
+const COMMANDS = new Set(['scan', 'usage']);
 
 function parseArgs(argv) {
   const flags = { list: false, json: false, help: false, open: null, week: false, redact: false, send: null };
@@ -77,13 +75,6 @@ function reportOpen(session, sendText) {
   }
 }
 
-function reportNewSession(agentId) {
-  const dir = process.cwd();
-  const { backend, failures } = openNewSession(agentId, dir);
-  failures.forEach((f) => console.error(t('cli.warning', { message: f })));
-  console.log(t('cli.openingNew', { agent: agentId, dir, backend }));
-}
-
 async function main() {
   const { flags, command, args, query } = parseArgs(process.argv.slice(2));
 
@@ -91,15 +82,6 @@ async function main() {
     process.stdout.write(HELP);
     return;
   }
-
-  if (command === 'lang') {
-    process.exitCode = require('../src/commands/lang').run(args[0]);
-    return;
-  }
-
-  // Dica unica, em vez de perguntar o idioma: pergunta na primeira execucao
-  // travaria uso em script e em pipe.
-  const primeiraVez = isFirstRun();
 
   const all = await scanAll();
   if (all.length === 0) {
@@ -160,13 +142,11 @@ async function main() {
     return;
   }
 
-  const { chosen, batch, sendText, newSessionAgent } = await pickSession(sessions, { sendPrompt: flags.send });
+  const { chosen, batch, sendText } = await pickSession(sessions, { sendPrompt: flags.send });
 
   // O lote (Tab pra marcar, Enter pra abrir tudo de uma vez) so existe depois
   // que o seletor fecha, porque a tela estava em modo alternativo ate agora;
-  // o relatorio so sai aqui. Quando ha uma sessao nova junto, ela sempre
-  // abre por ultimo (depois deste loop) - e por isso que o relatorio dela
-  // tambem sai so depois, nunca antes do lote.
+  // o relatorio so sai aqui.
   for (const entry of batch) {
     entry.failures.forEach((f) => console.error(t('cli.warning', { message: f })));
     if (entry.backend) {
@@ -183,22 +163,14 @@ async function main() {
     }
   }
 
-  if (newSessionAgent) {
-    reportNewSession(newSessionAgent);
-    if (primeiraVez) console.log(t('cli.langHint'));
-    return;
-  }
-
   if (!chosen) {
     // So e cancelamento de fato quando nada foi aberto; um lote bem-sucedido
     // ja fechou o seletor por conta propria, sem precisar dessa mensagem.
     if (batch.length === 0) console.log(t('cli.cancelled'));
-    if (primeiraVez) console.log(t('cli.langHint'));
     return;
   }
 
   reportOpen(chosen, sendText);
-  if (primeiraVez) console.log(t('cli.langHint'));
 }
 
 main().catch((err) => {

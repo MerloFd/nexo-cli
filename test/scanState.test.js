@@ -1,8 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-process.env.NEXO_LANG = 'en';
-
 const {
   flattenFindings,
   createState,

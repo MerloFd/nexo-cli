@@ -70,7 +70,6 @@ function createState(
     cwd = null,
     scope = 'global',
     sendPrompt = null,
-    newSessionAgents = [],
   } = {}
 ) {
   const base = inScope(items, scope, cwd);
@@ -91,13 +90,6 @@ function createState(
     previewOn: true,
     sendPrompt,
     confirmSend: null,
-    // Lista vazia desliga a funcionalidade inteira - testes e qualquer outro
-    // uso de createState sem passar isso continuam com o comportamento de
-    // sempre, indice 0 apontando pro primeiro item de verdade.
-    newSessionAgents,
-    atNewSession: newSessionAgents.length > 0,
-    newSessionMarked: false,
-    pickingProvider: null,
   };
 }
 
@@ -137,15 +129,8 @@ function toggleMark(state, sessionId) {
 }
 
 // Marca o item destacado e avanca pro proximo, para marcar varios em sequencia
-// sem soltar a tecla. Usado pelo Tab e pelo Ctrl+Enter (quando o terminal
-// manda essa combinacao) - os dois so marcam, nunca abrem.
+// sem soltar a tecla. So marca, nunca abre - o lote inteiro sobe no Enter.
 function markAndAdvance(state) {
-  // Tab na linha fixa de "nova sessao" marca ela tambem, igual a qualquer
-  // outro item - assim ela pode entrar num lote junto com sessoes reais.
-  if (state.atNewSession) {
-    return move({ ...state, newSessionMarked: !state.newSessionMarked }, 1, { wrap: true });
-  }
-
   const current = state.items[state.index];
   if (!current) return state;
   return move(toggleMark(state, current.sessionId), 1, { wrap: true });
@@ -168,29 +153,8 @@ function syncOffset(state) {
   return { ...state, offset: Math.min(Math.max(0, offset), maxOffset) };
 }
 
-// Com "nova sessao" ligado, a navegacao ganha uma posicao virtual (-1) antes
-// do primeiro item de verdade - o espaco todo vai de -1 a total-1, tamanho
-// total+1. Sem newSessionAgents (lista vazia), total+1 nunca entra em jogo:
-// o calculo cai direto no comportamento de sempre.
 function move(state, delta, { wrap = false } = {}) {
   const total = state.items.length;
-
-  if (state.newSessionAgents.length > 0) {
-    if (total === 0) return { ...state, atNewSession: true };
-
-    let pos = state.atNewSession ? -1 : state.index;
-    pos += delta;
-
-    if (wrap) {
-      pos = (((pos + 1) % (total + 1)) + (total + 1)) % (total + 1) - 1;
-    } else {
-      pos = Math.min(Math.max(-1, pos), total - 1);
-    }
-
-    if (pos === -1) return syncOffset({ ...state, atNewSession: true, index: 0 });
-    return syncOffset({ ...state, atNewSession: false, index: pos });
-  }
-
   if (total === 0) return state;
 
   let index = state.index + delta;
@@ -258,35 +222,6 @@ function selectOrNothing(state) {
   return { state, action: 'select' };
 }
 
-// Travado escolhendo provedor (depois do Enter com a nova sessao marcada ou
-// destacada): nada mais responde ate decidir - nem busca, nem navegacao na
-// lista esquerda, nem outro atalho. So setas (cicla provedor), Enter
-// (confirma, abre o lote com a sessao nova por ultimo) e Esc (desiste so da
-// sessao nova - marcas de sessoes reais continuam de pe) existem.
-function applyKeyDuringPickProvider(state, key) {
-  const name = key.name || '';
-  const total = state.newSessionAgents.length;
-
-  if (name === 'escape') {
-    return { state: { ...state, pickingProvider: null, newSessionMarked: false }, action: 'move' };
-  }
-
-  if (name === 'up' || name === 'down') {
-    const delta = name === 'up' ? -1 : 1;
-    const index = ((state.pickingProvider.index + delta) % total + total) % total;
-    return { state: { ...state, pickingProvider: { index } }, action: 'move' };
-  }
-
-  if (name === 'return' || name === 'enter') {
-    const agent = state.newSessionAgents[state.pickingProvider.index];
-    const items = markedRefs(state);
-    const limpo = { ...state, pickingProvider: null, newSessionMarked: false, marked: new Set() };
-    return { state: limpo, action: 'new-session-batch', agent, items };
-  }
-
-  return { state, action: 'none' };
-}
-
 // A busca esta sempre ativa: qualquer caractere imprimivel vai para o termo,
 // como no /resume do Claude Code. Por isso a navegacao fica nas setas - letra
 // nenhuma pode ser atalho, ou seria impossivel buscar por ela.
@@ -313,21 +248,12 @@ function applyKey(state, key = {}) {
   const seq = key.sequence || '';
 
   if (key.ctrl && (name === 'c' || name === 'd')) return { state, action: 'cancel' };
-  if (state.pickingProvider) return applyKeyDuringPickProvider(state, key);
   if (state.confirmSend) return applyKeyDuringConfirm(state, key);
   if (key.ctrl && name === 'a') return { state: toggleScope(state), action: 'move' };
   if (key.ctrl && name === 'right') return { state: cycleAgentFilter(state, 1), action: 'move' };
   if (key.ctrl && name === 'left') return { state: cycleAgentFilter(state, -1), action: 'move' };
   if (key.ctrl && name === 't') return { state: { ...state, previewOn: !state.previewOn }, action: 'move' };
   if (name === 'return' || name === 'enter' || seq === '\r' || seq === '\n') {
-    // Nova sessao marcada (Tab) ou destacada sem nada mais marcado (mesma
-    // regra do "Enter sem marca nenhuma age no destacado" de sempre) trava
-    // a escolha de provedor antes de abrir qualquer coisa.
-    const temNewSession = state.newSessionMarked || (state.marked.size === 0 && state.atNewSession);
-    if (temNewSession) {
-      return { state: { ...state, newSessionMarked: true, pickingProvider: { index: 0 } }, action: 'move' };
-    }
-
     const resultado = selectOrNothing(state);
     if (state.sendPrompt && (resultado.action === 'select' || resultado.action === 'open-batch')) {
       const items = resultado.action === 'open-batch' ? resultado.items : [state.items[state.index].ref];
@@ -700,49 +626,6 @@ function renderConfirmSend(state) {
   ].join('\n');
 }
 
-// Linha fixa no topo da lista, antes de qualquer sessao de verdade - sempre
-// visivel, nunca afetada por busca/escopo/filtro de agente. Lista vazia em
-// newSessionAgents desliga a funcionalidade inteira (retorna nada). Marcador
-// segue a mesma prioridade dos itens reais: destacado vence marcado.
-function renderNewSessionRow(state) {
-  if (state.newSessionAgents.length === 0) return [];
-  const selecionado = state.atNewSession;
-  const marcador = selecionado ? MARKER_SELECTED : state.newSessionMarked ? '✓ ' : '  ';
-  const rotulo = `${marcador}${t('newSession.row')}`;
-  // Negrito sempre, selecionado ou nao - e uma acao fixa, nao so mais um
-  // item da lista, e deve se destacar das sessoes mesmo sem estar destacada.
-  const texto = paint(state, selecionado ? ANSI.bold + ANSI.cyan : ANSI.bold, rotulo);
-  const cwd = paint(state, ANSI.dim, normalizeDir(state.cwd || process.cwd()));
-  return [`${texto} · ${cwd}`, ''];
-}
-
-// Painel da direita (mesma area do Ctrl+T) quando a nova sessao esta
-// destacada ou travada escolhendo provedor. "locked" so fica true depois do
-// Enter - antes disso e so uma previa navegavel (Tab marca, setas movem a
-// lista, nao o provedor). Cada provedor sai na cor da propria marca, igual a
-// lista principal usa - so o negrito e o marcador ">" mudam com a selecao.
-function renderProviderPanel(state) {
-  const locked = Boolean(state.pickingProvider);
-  const idx = locked ? state.pickingProvider.index : -1;
-
-  return [
-    paint(state, ANSI.bold, t(locked ? 'newSession.panel.titleLocked' : 'newSession.panel.titleBrowse')),
-    '',
-    ...state.newSessionAgents.map((agent, i) => {
-      const cor = AGENT_COLOR[agent] || ANSI.white;
-      const selecionado = locked && i === idx;
-      const texto = `${selecionado ? MARKER_SELECTED : '  '}${agent}`;
-      return paint(state, selecionado ? ANSI.bold + cor : cor, texto);
-    }),
-    '',
-    paint(state, ANSI.dim, t(locked ? 'newSession.panel.hintLocked' : 'newSession.panel.hintBrowse')),
-  ];
-}
-
-// Painel de provedor so precisa de espaco modesto (nomes curtos) - nao
-// merece o mesmo minimo de 116 colunas que a previa de conversa exige.
-const NEW_SESSION_PANEL_BREAKPOINT = 70;
-
 function render(state, previewLines) {
   if (state.confirmSend) return renderConfirmSend(state);
 
@@ -752,7 +635,7 @@ function render(state, previewLines) {
   const bodyState = { ...state, columns: bodyWidth };
   const lines = ['', header(state), '', ...searchBox(state), filterBar(state), ''];
 
-  const corpo = [...renderNewSessionRow(bodyState)];
+  const corpo = [];
   if (items.length === 0) {
     corpo.push(paint(bodyState, ANSI.dim, '  ' + t(state.query ? 'ui.empty.search' : 'ui.empty.scope')));
   } else {
@@ -761,7 +644,7 @@ function render(state, previewLines) {
     const end = Math.min(offset + viewport, items.length);
     const widths = columnWidths(items.slice(offset, end));
     for (let i = offset; i < end; i++) {
-      corpo.push(...renderItem(bodyState, items[i], i === index && !state.atNewSession, widths));
+      corpo.push(...renderItem(bodyState, items[i], i === index, widths));
     }
 
     const abaixo = items.length - end;
@@ -770,18 +653,8 @@ function render(state, previewLines) {
 
   let miolo = corpo;
   let meio = null;
-  const mostraPainelProvedor =
-    (state.atNewSession || Boolean(state.pickingProvider)) && columns >= NEW_SESSION_PANEL_BREAKPOINT;
 
-  if (mostraPainelProvedor) {
-    const largura = bodyWidth - 3; // 3 = " │ "
-    const leftWidth = Math.floor(largura * PREVIEW_RATIO);
-    const rightWidth = largura - leftWidth;
-    const painel = renderProviderPanel(bodyState);
-
-    miolo = composeSideBySide(bodyState, corpo, painel, leftWidth, rightWidth);
-    meio = leftWidth + 1; // posicao do divisor "│" dentro da linha, pro topo/fundo alinharem com "┬"/"┴"
-  } else if (previewActive(state) && items.length > 0) {
+  if (previewActive(state) && items.length > 0) {
     const largura = bodyWidth - 3; // 3 = " │ "
     const leftWidth = Math.floor(largura * PREVIEW_RATIO);
     const rightWidth = largura - leftWidth;

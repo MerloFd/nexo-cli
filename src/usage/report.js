@@ -93,8 +93,8 @@ function tabela(linhas, { titulo, ordenarPorChave = false, limite = 0, grandTota
   return out;
 }
 
-// Os rotulos mudam de tamanho entre idiomas, entao a coluna se alinha em
-// tempo de execucao em vez de depender de espacos fixos no texto.
+// A coluna se alinha em tempo de execucao em vez de depender de espacos
+// fixos dentro do texto do rotulo - editar uma string nao desalinha a tabela.
 const LARGURA_ROTULO = 14;
 
 function rotulo(nome, valor, pct) {

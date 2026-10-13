@@ -1,11 +1,8 @@
 const readline = require('readline');
-const { PassThrough } = require('stream');
 const { daysAgo } = require('./scanSessions');
-const { createState, applyKey, render, syncOffset, markAndAdvance, previewActive } = require('./selector');
-const { extractCtrlEnter } = require('./ctrlEnter');
+const { createState, applyKey, render, syncOffset, previewActive } = require('./selector');
 const { openSession } = require('./backends');
 const { loadPreview } = require('./preview');
-const { AGENTS } = require('./agents');
 
 const { ALT_SCREEN_ON, ALT_SCREEN_OFF, CURSOR_HIDE, CURSOR_SHOW, frame } = require('./screen');
 
@@ -31,10 +28,10 @@ function toRows(sessions) {
 // linha em branco + cabecalho + linha em branco + caixa de busca (3) + abas
 // de agente + indicadores de rolagem (2) + linha em branco + rodape = 12
 // linhas fixas fora da lista (a linha de abas sempre ocupa espaco, mesmo
-// vazia com um agente so - ver comentario em selector.js/filterBar), mais 2
-// pela linha fixa de "nova sessao" (ela + o respiro em branco depois dela).
+// vazia com um agente so - ver comentario em selector.js/filterBar). Cada
+// sessao ocupa DUAS linhas de tela (titulo + metadados), por isso o /2.
 function viewportFor(rows) {
-  return Math.max(1, Math.floor(((rows || 24) - 14) / 2));
+  return Math.max(1, Math.floor(((rows || 24) - 12) / 2));
 }
 
 // Abre uma sessao marcada como parte do lote final, disparado pelo Enter.
@@ -56,13 +53,6 @@ function openBatch(items, sendText) {
   return items.map((session, i) => openInBatch(session, { background: i !== last, sendText: sendText || null }));
 }
 
-// Quando a nova sessao entra no lote, ela que fica em foco (aberta depois,
-// por reportNewSession em bin/nexo.js) - entao toda sessao real aqui sobe em
-// segundo plano, sem excecao.
-function openNewSessionBatch(items) {
-  return items.map((session) => openInBatch(session, { background: true }));
-}
-
 function pickInteractive(sessions, { sendPrompt = null } = {}) {
   const rows = toRows(sessions);
   const out = process.stdout;
@@ -74,16 +64,10 @@ function pickInteractive(sessions, { sendPrompt = null } = {}) {
     color: !process.env.NO_COLOR,
     cwd: process.cwd(),
     sendPrompt,
-    newSessionAgents: AGENTS.map((a) => a.id),
   });
 
   return new Promise((resolve) => {
-    // O Windows Terminal manda Ctrl+Enter como sequencia de escape que o
-    // decodificador padrao do readline nao entende (ver src/ctrlEnter.js).
-    // Por isso os bytes crus passam primeiro por um filtro proprio, e so o
-    // que sobra chega ao decodificador de teclas, via este stream intermediario.
-    const decoded = new PassThrough();
-    readline.emitKeypressEvents(decoded);
+    readline.emitKeypressEvents(process.stdin);
 
     // Carregar a previa e I/O assincrono, mas o estado do seletor e sincrono
     // e puro de proposito (selector.js nao sabe o que e um arquivo). A previa
@@ -111,18 +95,6 @@ function pickInteractive(sessions, { sendPrompt = null } = {}) {
       });
     }
 
-    let carry = '';
-    function onRawData(chunk) {
-      const found = extractCtrlEnter(chunk.toString('latin1'), carry);
-      carry = found.carry;
-      for (let i = 0; i < found.hits; i++) {
-        state = markAndAdvance(state);
-        ensurePreview();
-        draw();
-      }
-      if (found.remainder) decoded.write(Buffer.from(found.remainder, 'latin1'));
-    }
-
     const wasRaw = process.stdin.isRaw;
     process.stdin.setRawMode(true);
     process.stdin.resume();
@@ -141,18 +113,17 @@ function pickInteractive(sessions, { sendPrompt = null } = {}) {
       draw();
     };
 
-    const finish = (result, sendText = null, newSessionAgent = null) => {
-      process.stdin.removeListener('data', onRawData);
-      decoded.removeListener('keypress', onKeypress);
+    const finish = (result, sendText = null) => {
+      process.stdin.removeListener('keypress', onKeypress);
       out.removeListener('resize', onResize);
       out.write(CURSOR_SHOW + ALT_SCREEN_OFF);
       if (process.stdin.isTTY) process.stdin.setRawMode(Boolean(wasRaw));
       process.stdin.pause();
-      resolve({ chosen: result, batch, sendText, newSessionAgent });
+      resolve({ chosen: result, batch, sendText });
     };
 
     function onKeypress(_str, key) {
-      const { state: next, action, items, send, agent } = applyKey(state, key || {});
+      const { state: next, action, items, send } = applyKey(state, key || {});
       state = next;
 
       if (action === 'cancel') return finish(null);
@@ -161,18 +132,13 @@ function pickInteractive(sessions, { sendPrompt = null } = {}) {
         batch.push(...openBatch(items, send ? sendPrompt : null));
         return finish(null);
       }
-      if (action === 'new-session-batch') {
-        batch.push(...openNewSessionBatch(items));
-        return finish(null, null, agent);
-      }
       if (action === 'move') {
         ensurePreview();
         draw();
       }
     }
 
-    process.stdin.on('data', onRawData);
-    decoded.on('keypress', onKeypress);
+    process.stdin.on('keypress', onKeypress);
     out.on('resize', onResize);
   });
 }
@@ -212,4 +178,4 @@ function pickSession(sessions, opts) {
   return pickNonInteractive(sessions);
 }
 
-module.exports = { pickSession, printPlainList, toRows, viewportFor, openInBatch, openBatch, openNewSessionBatch };
+module.exports = { pickSession, printPlainList, toRows, viewportFor, openInBatch, openBatch };

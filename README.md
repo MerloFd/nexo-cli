@@ -43,7 +43,7 @@ cd nexo-cli
 npm install -g .
 ```
 
-Node 18+. No external dependencies.
+Node 22.13+ (it uses the built-in `node:sqlite`). No external dependencies.
 
 ## Usage
 
@@ -52,14 +52,13 @@ nexo                list the sessions and open the one you pick
 nexo <term>         open the list already filtered
 nexo scan           look for credentials leaked into the session logs
 nexo usage          token usage overview
-nexo lang [en|pt]   show or change the interface language
 nexo --help         this help
 
 Options:
   --list              just print the sessions, no interactive list
   --json              JSON output (works for scan and usage too)
   --open <id>         open that session directly (a prefix of the id is enough)
-  --send <text>       ask to send this text to every session you open (Herdr only)
+  --send <text>       ask to send this text to every session you open (Herdr, tmux, WezTerm, kitty)
   --redact            in scan, remove high-confidence secrets (Claude only)
   --week              in usage, group by week instead of day
 
@@ -116,31 +115,6 @@ opens the highlighted session and closes the list.
 The label is the session's real name: the one you set with `/rename`, or the one
 the agent generated, or your first message — in that order.
 
-### Starting a new session
-
-The list always opens with **[+] - New session** pinned above every real
-session, bold, with the current directory in dim right after it. As soon as
-it's highlighted, the side panel — the same one `Ctrl+T` uses for the
-conversation preview — shows the provider list, each one colored with its own
-brand, no need to press anything first:
-
-```
-  [+] - New session · C:\DEV\nexo-cli     │ New session · pick a provider
-                                          │
-  Session switcher tool                  │   claude
-    claude · ... · now · HEAD            │   codex
-                                          │   opencode
-```
-
-**Tab** marks it just like any other session — useful to open it alongside a
-batch of real ones. **Enter** locks the choice: the panel takes focus (arrows
-pick a provider, Enter confirms, Esc backs out of just this part — any real
-sessions marked with Tab stay marked) and the rest of the list stops
-responding until you decide. Once confirmed, every marked real session opens
-first, and the new one opens **last**, so it's always the one left in focus.
-It goes through the exact same backend chain as resuming a session —
-agnostic of terminal, same as everything else in the list.
-
 ### `--send`, resuming several sessions at once
 
 ```
@@ -193,12 +167,6 @@ session started, not a full transcript reader.
 Session age also gets a color hint in the metadata line: green under an hour,
 cyan under a day, yellow under a week, and the usual dim beyond that.
 
-### Language
-
-English by default. `nexo lang pt` switches to Portuguese, `nexo lang` shows the
-current one — see [Configuration](#configuration) for where the choice is saved
-and how to override it for a single run.
-
 ### Where the session opens
 
 From the most capable option to the least:
@@ -228,18 +196,12 @@ Inside the VS Code integrated terminal the session opens in an external
 terminal: VS Code exposes no API to create a tab from the command line
 ([vscode#238786](https://github.com/microsoft/vscode/issues/238786)).
 
-Ctrl+Enter also marks, as a bonus, on terminals that send it as a distinct
-key combination — many don't, and it then behaves just like plain Enter with
-no way to tell the difference. Tab is the one guaranteed to work everywhere,
-since it's a single byte every terminal decodes the same way.
-
 ## Configuration
 
 No setup required — everything below has a sane default and is optional.
 
 | What | Where | Override |
 | --- | --- | --- |
-| Language | `~/.nexo-config.json` | `NEXO_LANG=pt` for a single run |
 | Session cache | `~/.nexo-cache.json` | `NEXO_NO_CACHE=1` disables it |
 | Scan cache | `~/.nexo-scan-cache.json` | `NEXO_NO_CACHE=1` disables it too |
 

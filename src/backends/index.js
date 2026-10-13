@@ -10,7 +10,7 @@ const konsole = require('./konsole');
 const xfce4Terminal = require('./xfce4Terminal');
 const terminalApp = require('./terminalApp');
 const fallback = require('./fallback');
-const { resumeArgs, newSessionArgs } = require('../agents');
+const { resumeArgs } = require('../agents');
 
 // Do mais certo para o menos certo. wezterm/kitty/iTerm2 prova por variavel de
 // ambiente que E aquele terminal rodando agora, nao so que o binario existe -
@@ -46,11 +46,8 @@ function assertValidSession(session) {
   }
 }
 
-// Mesma cadeia pra abrir sessao existente ou nova - cada backend so sabe
-// abrir um terminal com um comando dentro de um diretorio, nunca soube (nem
-// precisa saber) se o comando resume algo ou comeca do zero. E o que deixa
-// "nova sessao" automaticamente agnostico de terminal, sem nada especifico
-// por backend.
+// Cada backend so sabe abrir um terminal com um comando dentro de um
+// diretorio - nunca soube (nem precisa saber) o que o comando faz.
 function tryBackends(session, command, backends, opts) {
   assertValidSession(session);
 
@@ -82,12 +79,4 @@ function openSession(session, backends = BACKENDS, opts = {}) {
   return tryBackends(session, resumeArgs(session), backends, opts);
 }
 
-// Sem sessao de verdade ainda, so um id sintetico (valido pro formato que
-// assertValidSession exige) pra reaproveitar a mesma cadeia de backends -
-// nenhum backend le esse id pra nada alem de validacao de formato.
-function openNewSession(agentId, dir, backends = BACKENDS, opts = {}) {
-  const session = { dir, sessionId: 'new-session', agent: agentId };
-  return tryBackends(session, newSessionArgs(agentId), backends, opts);
-}
-
-module.exports = { openSession, openNewSession, assertValidSession, BACKENDS, SESSION_ID_RE };
+module.exports = { openSession, assertValidSession, BACKENDS, SESSION_ID_RE };

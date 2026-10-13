@@ -1,8 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-// Fixa o idioma: sem isso a suite quebraria conforme a preferencia da maquina.
-process.env.NEXO_LANG = 'en';
 const fs = require('fs');
 const os = require('os');
 const path = require('path');

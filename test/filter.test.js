@@ -1,9 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-// Fixa o idioma: sem isso a suite quebraria conforme a preferencia da maquina.
-process.env.NEXO_LANG = 'en';
-
 const { createState, applyKey, render, filterItems, normalize } = require('../src/selector');
 
 const SAMPLE = [

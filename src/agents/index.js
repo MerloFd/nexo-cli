@@ -28,11 +28,4 @@ function resumeArgs(session) {
   return agent.resumeArgs(session);
 }
 
-// Chamar o CLI do agente sem nenhum argumento de resume ja inicia uma sessao
-// nova - nao precisa de nada especifico de cada adapter.
-function newSessionArgs(agentId) {
-  if (!byId(agentId)) throw new Error(`Agente desconhecido: ${agentId}`);
-  return [agentId];
-}
-
-module.exports = { AGENTS, scanAll, byId, resumeArgs, newSessionArgs };
+module.exports = { AGENTS, scanAll, byId, resumeArgs };
