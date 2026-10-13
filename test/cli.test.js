@@ -29,6 +29,15 @@ function makeHome() {
     'utf8'
   );
 
+  // A ordem da lista vem do mtime (mais recente primeiro), e no NTFS os dois
+  // writes acima caem no MESMO timestamp (granularidade de ~15ms): o sort
+  // fica estavel e a ordem passa a depender do readdir, nao da recencia. Os
+  // testes que falam de "item 1 da lista" precisam dessa ordem fixa, entao os
+  // mtimes sao gravados a mao, com Beta deliberadamente mais novo.
+  const base = Date.now() / 1000;
+  fs.utimesSync(path.join(proj, 'aaa11111-1111-1111-1111-111111111111.jsonl'), base - 60, base - 60);
+  fs.utimesSync(path.join(proj, 'bbb22222-2222-2222-2222-222222222222.jsonl'), base, base);
+
   return home;
 }
 
@@ -41,7 +50,6 @@ function run(args, { home = makeHome(), expectFail = false, input } = {}) {
     HERDR_WORKSPACE_ID: '',
     TMUX: '',
     NEXO_FORCE_FALLBACK: '1',
-    NEXO_LANG: 'en',
   };
 
   try {
