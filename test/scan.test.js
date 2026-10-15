@@ -169,7 +169,7 @@ function sessaoDe(filePath) {
 
 test('scanSessions nao rele um arquivo que nao mudou desde o ultimo scan', async (t) => {
   const file = escrever([JSON.stringify({ message: { content: `chave: ${FAKE.aws}` } })]);
-  const cacheFile = path.join(os.tmpdir(), `nexo-scan-cache-${Date.now()}.json`);
+  const cacheFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-scan-cache-')), 'cache.json');
 
   const leituras = t.mock.method(fs, 'createReadStream');
 
@@ -186,7 +186,7 @@ test('scanSessions nao rele um arquivo que nao mudou desde o ultimo scan', async
 
 test('NEXO_NO_CACHE=1 ignora o cache do scan e rele sempre', async (t) => {
   const file = escrever([JSON.stringify({ message: { content: `chave: ${FAKE.aws}` } })]);
-  const cacheFile = path.join(os.tmpdir(), `nexo-scan-cache-${Date.now()}.json`);
+  const cacheFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-scan-cache-')), 'cache.json');
   const leituras = t.mock.method(fs, 'createReadStream');
 
   const antes = process.env.NEXO_NO_CACHE;
@@ -203,7 +203,7 @@ test('NEXO_NO_CACHE=1 ignora o cache do scan e rele sempre', async (t) => {
 
 test('scanSessions tambem cacheia o "nada encontrado" - nao so os achados', async (t) => {
   const file = escrever(['linha comum, sem segredo nenhum']);
-  const cacheFile = path.join(os.tmpdir(), `nexo-scan-cache-${Date.now()}.json`);
+  const cacheFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'nexo-scan-cache-')), 'cache.json');
   const leituras = t.mock.method(fs, 'createReadStream');
 
   const primeira = await scanSessions([sessaoDe(file)], { cacheFile });
