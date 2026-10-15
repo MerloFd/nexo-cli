@@ -81,15 +81,18 @@ test('escopo local sem sessao explica como sair dele', () => {
 
 const { uniqueAgents, cycleAgentFilter } = require('../src/selector');
 
+// "outro" e um agente sintetico de proposito: o ciclo do filtro e generico
+// sobre o que aparece nos dados, nao sobre a lista de agentes registrados -
+// usar um nome inventado prova isso e mantem a cobertura de wrap com N>2.
 const MULTI_AGENT = [
   { dir: 'C:\DEV\App', sessionId: 'c1', agent: 'claude', age: 'agora', summary: 'um' },
   { dir: 'C:\DEV\App', sessionId: 'x1', agent: 'codex', age: 'agora', summary: 'dois' },
-  { dir: 'C:\DEV\App', sessionId: 'o1', agent: 'opencode', age: 'agora', summary: 'tres' },
+  { dir: 'C:\DEV\App', sessionId: 'o1', agent: 'outro', age: 'agora', summary: 'tres' },
   { dir: 'C:\DEV\App', sessionId: 'c2', agent: 'claude', age: 'agora', summary: 'quatro' },
 ];
 
 test('uniqueAgents preserva a ordem de aparicao, sem repetir', () => {
-  assert.deepStrictEqual(uniqueAgents(MULTI_AGENT), ['claude', 'codex', 'opencode']);
+  assert.deepStrictEqual(uniqueAgents(MULTI_AGENT), ['claude', 'codex', 'outro']);
 });
 
 test('ctrl+direita cicla pelos agentes, comecando em "todos"', () => {
@@ -105,7 +108,7 @@ test('ctrl+direita cicla pelos agentes, comecando em "todos"', () => {
   assert.strictEqual(state.items.length, 1);
 
   state = applyKey(state, { name: 'right', ctrl: true }).state;
-  assert.strictEqual(state.agentFilter, 'opencode');
+  assert.strictEqual(state.agentFilter, 'outro');
 
   state = applyKey(state, { name: 'right', ctrl: true }).state;
   assert.strictEqual(state.agentFilter, null, 'da volta pra todos depois do ultimo');
@@ -115,7 +118,7 @@ test('ctrl+direita cicla pelos agentes, comecando em "todos"', () => {
 test('ctrl+esquerda cicla para tras', () => {
   let state = createState(MULTI_AGENT, { viewport: 5 });
   state = applyKey(state, { name: 'left', ctrl: true }).state;
-  assert.strictEqual(state.agentFilter, 'opencode', 'de "todos" para tras vai pro ultimo agente');
+  assert.strictEqual(state.agentFilter, 'outro', 'de "todos" para tras vai pro ultimo agente');
 });
 
 test('filtro de agente se combina com a busca de texto', () => {

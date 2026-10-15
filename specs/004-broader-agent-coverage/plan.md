@@ -1,5 +1,15 @@
 # Implementation Plan: Broader Terminal Agent Coverage
 
+> **Update 2026-10-14 — Track A is void.** The opencode adapter was removed
+> instead of validated: opencode 2.0 renamed the `session` table to
+> `session_v2`, so the adapter silently returned nothing on any current
+> install, and `scan`/`usage` could never work for it because opencode keeps
+> conversations in a `session_message` table rather than a file. Track B
+> (adding agents) still stands, but with a lesson attached: an adapter built
+> from a published schema and tested only against a synthetic fixture can
+> rot without a single test going red. Any new agent should ship with a way
+> to tell "no sessions" apart from "could not read the store".
+
 **Branch**: `004-broader-agent-coverage` | **Date**: 2026-09-28 | **Spec**: [spec.md](./spec.md)
 
 **Status**: Not started, split into two independent tracks that don't block

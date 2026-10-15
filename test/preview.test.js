@@ -86,7 +86,7 @@ test('loadPreview so atende Claude por enquanto - outros agentes devolvem null',
   assert.ok(Array.isArray(claude) && claude.length === 1);
 
   assert.strictEqual(await loadPreview({ agent: 'codex', filePath: file }), null);
-  assert.strictEqual(await loadPreview({ agent: 'opencode', filePath: null }), null);
+  assert.strictEqual(await loadPreview({ agent: 'desconhecido', filePath: null }), null);
 });
 
 test('claude sem filePath tambem devolve null, nao quebra', async () => {

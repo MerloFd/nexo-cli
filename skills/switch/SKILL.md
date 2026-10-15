@@ -1,7 +1,7 @@
 ---
 name: switch
 description: >
-  Lista as sessoes de agentes de IA de terminal (Claude Code, Codex, opencode)
+  Lista as sessoes de agentes de IA de terminal (Claude Code e Codex)
   de todos os repositorios da maquina e abre a escolhida em um terminal novo,
   ja resumida. Tambem procura credencial vazada nos logs e mostra uso de
   tokens. Use quando o usuario perguntar "em que eu estava trabalhando",

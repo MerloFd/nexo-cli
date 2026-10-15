@@ -316,14 +316,12 @@ function formatTurns(turns) {
 }
 
 // Cor fixa por agente, usando a cor real de cada marca (nao uma escolhida por
-// nos) - terracota do Claude, verde do OpenAI/Codex, azul do accent do
-// opencode.ai, todas em truecolor pra bater com a marca de verdade. Fora da
-// paleta do age (verde/ciano/amarelo/dim) de proposito, senao os dois
-// significados se confundiriam na mesma cor.
+// nos) - terracota do Claude, verde do OpenAI/Codex, as duas em truecolor pra
+// bater com a marca de verdade. Fora da paleta do age (verde/ciano/amarelo/
+// dim) de proposito, senao os dois significados se confundiriam na mesma cor.
 const AGENT_COLOR = {
   claude: '\x1b[38;2;217;119;87m',
   codex: '\x1b[38;2;16;163;127m',
-  opencode: '\x1b[38;2;0;122;255m',
 };
 const DIR_COLUMN_MAX = 36;
 

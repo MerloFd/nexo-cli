@@ -4,9 +4,15 @@ const { runInteractiveScan } = require('../scan/interactive');
 const { daysAgo } = require('../scanSessions');
 const { t } = require('../i18n');
 
-// V1 do redact so cobre Claude: e o unico agente que ainda grava sessao como
-// arquivo texto que da para reescrever linha a linha. O Codex atual guarda em
-// SQLite, e mexer num banco pede outra abordagem, ainda nao feita.
+// Redact so cobre Claude por escolha de escopo, NAO por formato: o rollout do
+// Codex tambem e JSONL de uma linha por entrada, e redactFile() roda nele sem
+// corromper nada (verificado - segredo removido, toda linha segue JSON valido,
+// session_meta intacto). O que falta e que o mesmo segredo fica TAMBEM na
+// coluna first_user_message do state*.sqlite: redigir so o rollout deixaria
+// uma copia legivel no banco - e e justamente essa coluna que aparece como
+// resumo da sessao na lista. Cobrir o Codex de verdade exige redigir os dois
+// lugares e definir o que "possivelmente ativa" significa num banco em WAL,
+// onde o mtime do arquivo nao basta. Ver specs/003-codex-redact.
 function redactCandidates(results) {
   return results.filter(
     (r) => r.agent === 'claude' && r.findings.some((f) => f.confidence === 'alta')

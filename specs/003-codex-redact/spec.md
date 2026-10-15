@@ -1,5 +1,22 @@
 # Feature Specification: Codex Support for `nexo scan --redact`
 
+> **Update 2026-10-14 — the stated blocker is resolved; the feature is still
+> not taken.** FR-006 asked whether a session made by the current Codex
+> version still writes a rollout file. It does: the SQLite is a catalog and
+> the conversation lives in the rollout JSONL. `redactFile()` was run
+> against a Codex rollout unchanged and worked - 2 occurrences replaced, the
+> secret gone, every line still valid JSON, `session_meta` and nested
+> structure intact. So the format argument for excluding Codex is wrong, and
+> the code comment that made it has been corrected.
+>
+> What remains open is FR-005, and it is the real reason `--redact` is still
+> Claude-only: the same secret is also stored in the `first_user_message`
+> column of `state*.sqlite`. Redacting the rollout alone leaves a readable
+> copy in the database (and that column is what nexo shows as the session
+> summary in the list). Covering Codex honestly means redacting both places,
+> plus deciding what "possibly active" means for a WAL database - a file
+> mtime check is not enough there.
+
 **Feature Branch**: `003-codex-redact`
 
 **Created**: 2026-09-28
@@ -27,7 +44,7 @@ command silently does nothing for roughly half the supported agents, which
 is a correctness gap disclosed in the README but still a real gap.
 
 **Independent Test**: A synthetic Codex session (SQLite fixture, following
-the pattern in `test/opencode.test.js` and `src/agents/codex.js`'s own
+the pattern in the removed `test/opencode.test.js` (see git history) and `src/agents/codex.js`'s own
 tests) contains a high-confidence secret in some text field; after
 `--redact`, the value is gone and the database is still readable by Codex.
 

@@ -76,8 +76,9 @@ async function loadClaudePreview(filePath) {
 }
 
 // null = agente sem previa disponivel ainda (mostra aviso, nao erro).
-// So Claude por enquanto: Codex mudou de JSONL pra SQLite recentemente e o
-// schema de mensagem e outro; opencode nem tem session.filePath hoje.
+// So Claude: o rollout do Codex tambem e JSONL, mas o formato de mensagem e
+// outro (response_item com payload.content[].input_text, contra o
+// message.content[].text do Claude) - precisa de um extrator proprio.
 async function loadPreview(session) {
   if (session.agent === 'claude' && session.filePath) {
     return loadClaudePreview(session.filePath);

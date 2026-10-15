@@ -1,6 +1,7 @@
-// Os agentes gravam o mesmo diretorio ora como "c:\DEV" ora como "C:\DEV",
-// e o opencode usa barra normal no Windows. Sem normalizar, o mesmo projeto
-// aparece duas vezes na lista e no relatorio de uso.
+// Os agentes gravam o mesmo diretorio ora como "c:\DEV" ora como "C:\DEV", e
+// no Windows a barra pode vir normal em vez de invertida. Sem normalizar, o
+// mesmo projeto aparece duas vezes na lista e no relatorio de uso - identidade
+// de diretorio nao e igualdade de string.
 function normalizeDir(dir) {
   if (!dir) return dir;
 

@@ -1,8 +1,7 @@
 const claude = require('./claude');
 const codex = require('./codex');
-const opencode = require('./opencode');
 
-const AGENTS = [claude, codex, opencode];
+const AGENTS = [claude, codex];
 
 function byId(id) {
   return AGENTS.find((agent) => agent.id === id) || null;

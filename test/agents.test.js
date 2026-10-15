@@ -3,8 +3,8 @@ const assert = require('node:assert');
 
 const { AGENTS, byId, resumeArgs } = require('../src/agents');
 
-test('AGENTS lista claude, codex e opencode', () => {
-  assert.deepStrictEqual(AGENTS.map((a) => a.id).sort(), ['claude', 'codex', 'opencode']);
+test('AGENTS lista claude e codex', () => {
+  assert.deepStrictEqual(AGENTS.map((a) => a.id).sort(), ['claude', 'codex']);
 });
 
 test('byId acha o adapter certo, ou null se nao existir', () => {

@@ -23,7 +23,7 @@ referenced by each thread's `rollout_path`.
 
 **Testing**: Mirror `test/redact.test.js`'s approach (synthetic fixture,
 runtime-built fake secret values, never a real-shaped literal in source) and
-`test/opencode.test.js`'s approach to building a throwaway SQLite fixture
+the removed `test/opencode.test.js`'s approach to building a throwaway SQLite fixture (see git history)
 with `node:sqlite`.
 
 **Target Platform**: Same as the rest of nexo.

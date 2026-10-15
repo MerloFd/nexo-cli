@@ -29,11 +29,29 @@ taking down what you already have open.
 
 ## Supported agents
 
-| Agent | Status |
-| --- | --- |
-| [Claude Code](https://claude.com/claude-code) | Full support — list, search, resume, preview, `scan --redact` |
-| [Codex](https://openai.com/codex/) | List, search, resume, `scan` — no preview or `--redact` yet |
-| [opencode](https://opencode.ai) | Best-effort — built from its public schema, not verified against a real install (see [How it works](#how-it-works)) |
+| | List, search, resume | `usage` | `scan` | `scan --redact` | Preview |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| [Claude Code](https://claude.com/claude-code) | yes | yes | yes | yes | yes |
+| [Codex](https://openai.com/codex/) | yes | yes | yes | no | no |
+
+Every cell above is exercised by a test. Two deliberate gaps, both on Codex:
+
+- **`--redact`** is Claude-only by scope choice, not by format: Codex keeps the
+  conversation in a rollout JSONL of the same line shape, and the existing
+  rewrite logic already redacts it correctly. The reason it's off is that the
+  same secret is *also* stored in the `first_user_message` column of
+  `state*.sqlite`, so covering Codex honestly means redacting both places —
+  see [`specs/003-codex-redact`](./specs/003-codex-redact/spec.md).
+- **Preview** needs its own extractor for Codex: the rollout is JSONL too, but
+  a message is `response_item` with `payload.content[].input_text`, not
+  Claude's `message.content[].text`.
+
+[opencode](https://opencode.ai) was supported until it was dropped — its
+2.0 release renamed the `session` table to `session_v2`, so the adapter
+silently returned nothing on any current install, and `scan`/`usage` could
+never work at all because opencode keeps conversations in a `session_message`
+table rather than a file. Rather than ship a third agent that reads as
+supported and isn't, it was removed.
 
 ## Install
 
@@ -159,8 +177,8 @@ the terminal is at least 116 columns wide; **Ctrl+T** toggles it off:
                                                         │   Achado. specify-cli tá instalado...
 ```
 
-Preview is Claude-only for now — Codex and opencode show a plain "no preview"
-message instead of content. It shows the first ~4000 characters of the
+Preview is Claude-only — Codex shows a plain "no preview" message instead of
+content. It shows the first ~4000 characters of the
 conversation, no syntax highlighting, no scrolling: a quick look at where the
 session started, not a full transcript reader.
 
@@ -340,12 +358,12 @@ are not billed per unit, so any amount would be made up.
 | --- | --- | --- |
 | Claude Code | `~/.claude/projects/*/*.jsonl` | `claude -r <id>` |
 | Codex | `~/.codex/state*.sqlite`, falling back to the JSONL rollouts | `codex resume <id>` |
-| opencode | `~/.local/share/opencode/opencode.db` (`OPENCODE_DB` overrides it) | `opencode --session <id>` |
 
-The opencode adapter is built from its public schema, unit-tested against a
-synthetic database, but not verified against a real opencode installation —
-none was available while writing it. If you use opencode and hit a problem,
-please open an issue.
+For Codex the SQLite file is a catalog: it carries thread metadata (directory,
+branch, title, model, token totals) and a `rollout_path` pointing at the JSONL
+where the conversation itself lives. `scan` and `usage` read that rollout, not
+the database — which is why both work for Codex even though the index is a
+database.
 
 The project directory comes from the `cwd` field inside the file, never from the
 folder name: `C--DEV-SO5-SO5-Back-End` is too ambiguous to decode back.
