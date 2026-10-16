@@ -14,7 +14,7 @@ re-derived from scratch in a future conversation.
 | --- | --- | --- |
 | [001](./001-shadow-ai-oversight/spec.md) | Shadow AI oversight for teams | Architecture undecided — whether nexo builds a collector or just stays an emitter other tooling consumes |
 | [002](./002-semantic-content-classifier/spec.md) | Semantic content classifier (Laya) | ~1.7 GB model + native runtime dependency, disproportionate for the core CLI; no lighter option evaluated |
-| [003](./003-codex-redact/spec.md) | Codex support for `scan --redact` | Unblocked but deliberately not taken: the rollout rewrite is verified to work, the open part is that the secret is also in `state*.sqlite` |
+| ~~[003](./003-codex-redact/spec.md)~~ | ~~Codex support for `scan --redact`~~ | **Shipped 2026-10-15** - both the rollout and the `threads` text columns are cleaned, gated by a real SQLite write lock instead of an mtime guess |
 | [004](./004-broader-agent-coverage/spec.md) | Broader terminal agent coverage | No chosen next agent (Track A died with the opencode adapter — see below) |
 
 ## Verification backlog (not full specs — smaller than that)
@@ -26,10 +26,11 @@ Shipped, but not exercised against the real thing:
   `xfce4Terminal.js`) — each has unit tests with a forged platform and
   environment, but none has run against a real Mac or Linux machine. Written
   entirely on Windows.
-- **Codex adapter's SQLite read** (`scanSqlite` in `src/agents/codex.js`) — the
-  column set was verified against a real installation when it was written, but
-  there is no test that builds a `threads` fixture, so a schema change upstream
-  would surface as an empty list rather than a failing test.
+- **Codex adapter against a live installation** — the column set was verified
+  against a real install when written, and `threads` fixtures now cover the
+  read, the schema-drift fallback and the redact write (`test/redactCodex.test.js`).
+  What is still untested against the real thing is the end-to-end round trip:
+  no `codex resume` has been run on a database nexo had redacted.
 
 ## Removed
 

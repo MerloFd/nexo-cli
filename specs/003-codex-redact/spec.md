@@ -1,21 +1,28 @@
 # Feature Specification: Codex Support for `nexo scan --redact`
 
-> **Update 2026-10-14 — the stated blocker is resolved; the feature is still
-> not taken.** FR-006 asked whether a session made by the current Codex
-> version still writes a rollout file. It does: the SQLite is a catalog and
-> the conversation lives in the rollout JSONL. `redactFile()` was run
-> against a Codex rollout unchanged and worked - 2 occurrences replaced, the
-> secret gone, every line still valid JSON, `session_meta` and nested
-> structure intact. So the format argument for excluding Codex is wrong, and
-> the code comment that made it has been corrected.
+> **Status 2026-10-15 — SHIPPED.** `nexo scan --redact` cobre o Codex.
 >
-> What remains open is FR-005, and it is the real reason `--redact` is still
-> Claude-only: the same secret is also stored in the `first_user_message`
-> column of `state*.sqlite`. Redacting the rollout alone leaves a readable
-> copy in the database (and that column is what nexo shows as the session
-> summary in the list). Covering Codex honestly means redacting both places,
-> plus deciding what "possibly active" means for a WAL database - a file
-> mtime check is not enough there.
+> FR-006 (o bloqueio declarado) estava resolvido: o Codex atual AINDA escreve
+> rollout JSONL - o SQLite e catalogo, a conversa vive no arquivo - e
+> `redactFile()` roda nele sem corromper nada. O argumento de formato que
+> excluia o Codex estava errado.
+>
+> FR-005 foi fechado implementando `src/scan/redactCodex.js`: as colunas de
+> texto do `threads` (`first_user_message`, `title`, `name`, `preview`) sao
+> limpas na mesma passada que o rollout, e o SELECT/UPDATE se monta a partir
+> de `PRAGMA table_info` em vez de nomear colunas fixas - instalacao com
+> conjunto de coluna diferente nao derruba nada.
+>
+> FR-002 (o que significa "possivelmente ativa" num banco em WAL) foi
+> resolvido sem heuristica: antes de escrever, o redact pede o lock de
+> escrita com `BEGIN IMMEDIATE`. Se outro processo o detem, a sessao e pulada
+> INTEIRA - rollout incluso - porque o banco entra primeiro justamente para
+> servir de porta. Isso e pergunta ao SQLite, nao chute por mtime, e cobre o
+> WAL, onde o mtime do `.sqlite` principal pode nem mudar durante a escrita.
+>
+> Falha do rollout DEPOIS do commit do banco e reportada como `PARTIAL`, em
+> vez de sucesso. Coberto por `test/redactCodex.test.js` (15 testes, dois
+> deles com processo concorrente segurando o lock de verdade).
 
 **Feature Branch**: `003-codex-redact`
 

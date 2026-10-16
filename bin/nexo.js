@@ -18,7 +18,7 @@ Usage:
 Options:
   --list              just print the sessions
   --json              JSON output (works for scan and usage too)
-  --redact            in scan, remove high-confidence secrets (Claude only)
+  --redact            in scan, remove high-confidence secrets (no confirmation)
   --week              in usage, group by week instead of day
   --open <id>         open that session directly (a prefix is enough)
   --send <text>       ask to send this text to every session you open (Herdr, tmux, WezTerm, kitty)

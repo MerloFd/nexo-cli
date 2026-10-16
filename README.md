@@ -19,8 +19,9 @@ taking down what you already have open.
 - **Tab** marks several sessions, **Enter** reopens all of them at once.
 - **`--send`** asks each reopened session "where did we leave off?" for you,
   after confirming — no more retyping the same question into every tab.
-- Built-in **credential scanner** (`nexo scan`) and redaction for secrets
-  that leaked into a session log.
+- Built-in **credential scanner** (`nexo scan`) that never prints the value it
+  found, and a redaction pass that cleans every place the secret is stored —
+  for Codex, the rollout log *and* the SQLite index.
 - **Token usage breakdown** (`nexo usage`) by day, agent, model and project.
 - Colored, table-aligned list with a live side-by-side conversation preview.
 - 11 terminal environments detected automatically (see [Where the session
@@ -32,19 +33,12 @@ taking down what you already have open.
 | | List, search, resume | `usage` | `scan` | `scan --redact` | Preview |
 | --- | :-: | :-: | :-: | :-: | :-: |
 | [Claude Code](https://claude.com/claude-code) | yes | yes | yes | yes | yes |
-| [Codex](https://openai.com/codex/) | yes | yes | yes | no | no |
+| [Codex](https://openai.com/codex/) | yes | yes | yes | yes | no |
 
-Every cell above is exercised by a test. Two deliberate gaps, both on Codex:
-
-- **`--redact`** is Claude-only by scope choice, not by format: Codex keeps the
-  conversation in a rollout JSONL of the same line shape, and the existing
-  rewrite logic already redacts it correctly. The reason it's off is that the
-  same secret is *also* stored in the `first_user_message` column of
-  `state*.sqlite`, so covering Codex honestly means redacting both places —
-  see [`specs/003-codex-redact`](./specs/003-codex-redact/spec.md).
-- **Preview** needs its own extractor for Codex: the rollout is JSONL too, but
-  a message is `response_item` with `payload.content[].input_text`, not
-  Claude's `message.content[].text`.
+Every cell above is exercised by a test. One gap remains: **preview** needs
+its own extractor for Codex, because a message in its rollout is a
+`response_item` with `payload.content[].input_text`, not Claude's
+`message.content[].text`.
 
 [opencode](https://opencode.ai) was supported until it was dropped — its
 2.0 release renamed the `session` table to `session_v2`, so the adapter
@@ -77,7 +71,7 @@ Options:
   --json              JSON output (works for scan and usage too)
   --open <id>         open that session directly (a prefix of the id is enough)
   --send <text>       ask to send this text to every session you open (Herdr, tmux, WezTerm, kitty)
-  --redact            in scan, remove high-confidence secrets (Claude only)
+  --redact            in scan, remove high-confidence secrets (no confirmation)
   --week              in usage, group by week instead of day
 
 In the list:
@@ -222,6 +216,15 @@ No setup required — everything below has a sane default and is optional.
 | --- | --- | --- |
 | Session cache | `~/.nexo-cache.json` | `NEXO_NO_CACHE=1` disables it |
 | Scan cache | `~/.nexo-scan-cache.json` | `NEXO_NO_CACHE=1` disables it too |
+| Claude sessions | `~/.claude/projects/` | — |
+| Codex sessions | `~/.codex/` | `CODEX_HOME=/some/path` |
+| Color output | on when the terminal supports it | `NO_COLOR=1` turns it off |
+
+Everything else nexo reads from the environment (`WT_SESSION`, `TMUX`,
+`WEZTERM_PANE`, `KITTY_WINDOW_ID`, `TERM_PROGRAM`, `HERDR_ENV`) is for
+*detecting* which terminal is running — you don't set those, your terminal
+does. `NEXO_FORCE_FALLBACK=1` exists so the test suite never opens real
+terminal windows.
 
 The cache is keyed by each session file's mtime and size, so it only re-reads
 what actually changed — that's what keeps the list opening in about 100ms
@@ -298,18 +301,40 @@ nexo scan --redact
 Same rewrite as picking every high-confidence finding in the interactive
 table, but non-interactive and unconditional — for automation, where nothing
 is there to confirm a modal. Replaces the value in place with `[REDACTED]`,
-keeping the line valid JSON. Deliberately narrow, for now:
+keeping the line valid JSON.
 
-- **Claude Code only.** Codex now stores sessions in SQLite, which needs a
-  different rewrite approach that isn't built yet.
+**Codex sessions store the same secret twice**, so both are cleaned in one go
+and the report says how much came out of each:
+
+```
+REDACTING (high-confidence findings only):
+  0199aaaa: 2 occurrence(s) removed (1 in the session log, 1 in the Codex index)
+```
+
+The session log is the rollout JSONL; the index is the `first_user_message`
+column of `state*.sqlite`, which is also what nexo shows as the session
+summary in the list. Cleaning only the log would leave a readable copy in the
+database — and still show it on screen.
+
+Deliberately narrow:
+
 - **High-confidence findings only** (a real key/token shape). Medium and low
   confidence findings can be quoted code or noise, and rewriting one by
   mistake is not reversible — those are left alone; review them by hand.
 - **A session changed in the last 5 minutes is skipped**, since a live agent
   may still be appending to that same file — rewriting under it could
   corrupt the next write. This is a heuristic, not a guarantee.
+- **A Codex database being written to right now is skipped too** — and that
+  one is not a heuristic. Before touching anything, nexo asks SQLite for the
+  write lock (`BEGIN IMMEDIATE`); if another process holds it, the session is
+  skipped whole, log included. The database goes first precisely so a refusal
+  leaves nothing half-cleaned. This also covers WAL mode, where the main
+  `.sqlite` file's mtime can sit still while writes are happening.
 - For a private key, the **whole PEM block** is removed, not just the
   `-----BEGIN...-----` marker line the report shows.
+- If the log write fails *after* the database was already committed, the
+  report says `PARTIAL` instead of reporting success — a half-clean session
+  that reads as done is the one outcome worth shouting about.
 
 This only removes the **local copy**. The secret was already sent to the
 provider with the conversation — rotate it; `--redact` does not undo that.
@@ -361,9 +386,21 @@ are not billed per unit, so any amount would be made up.
 
 For Codex the SQLite file is a catalog: it carries thread metadata (directory,
 branch, title, model, token totals) and a `rollout_path` pointing at the JSONL
-where the conversation itself lives. `scan` and `usage` read that rollout, not
-the database — which is why both work for Codex even though the index is a
-database.
+where the conversation itself lives. `usage` reads only that rollout, which is
+why per-turn token data works for Codex even though the index is a database.
+
+`scan` reads both, because the secret can be in either: the conversation is in
+the rollout, but a credential pasted as the first message is *also* copied into
+`first_user_message` — and that column is what nexo renders as the session
+summary. A finding that came from there is reported as `in the session
+title/summary` instead of a line number, since it has no line.
+
+The file is picked by migration number, not by name: `state_11.sqlite` beats
+`state_9.sqlite`, which sorting as text would get backwards. And the `SELECT`
+is assembled from `PRAGMA table_info` rather than naming fixed columns —
+Codex's own docs warn that column sets differ between installations, and one
+missing column used to drop the whole query and silently fall back to scanning
+raw JSONL, losing branch, model and token totals with no warning.
 
 The project directory comes from the `cwd` field inside the file, never from the
 folder name: `C--DEV-SO5-SO5-Back-End` is too ambiguous to decode back.
@@ -386,6 +423,15 @@ is controlled.
 ```
 npm test
 ```
+
+319 tests on `node:test`, no test framework and no runtime dependencies. The
+TUI is tested without opening a terminal: keyboard handling and rendering are
+pure functions (`src/selector.js`, `src/scanState.js`, `src/usageState.js`)
+that take state and return state or a string, while the I/O loops that own
+raw mode live apart (`src/pick.js`, `src/scan/interactive.js`,
+`src/usage/interactive.js`). The redact tests spawn a real competing process
+holding a SQLite write lock, to prove the session is skipped instead of
+half-cleaned.
 
 ## License
 

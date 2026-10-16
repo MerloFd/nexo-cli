@@ -89,10 +89,17 @@ que merecem conferencia antes de qualquer acao.
 Se houver achado de alta confianca, a orientacao e sempre a mesma, nessa
 ordem: **1)** rotacionar a credencial (ela ja foi enviada ao provedor junto
 com a conversa, apagar o log local nao desfaz isso); **2)** so depois, se
-quiser, `nexo scan --redact` remove a copia local (so sessoes do Claude, so
-achados de alta confianca). Explique que isso nao desfaz o vazamento, so
-reduz a exposicao local, e confirme com o usuario antes de rodar - reescreve
-o arquivo original de outro programa.
+quiser, `nexo scan --redact` remove a copia local (so achados de alta
+confianca). Explique que isso nao desfaz o vazamento, so reduz a exposicao
+local, e confirme com o usuario antes de rodar - reescreve arquivo original
+de outro programa.
+
+Numa sessao do Codex o segredo fica em dois lugares (o rollout JSONL e a
+coluna first_user_message do state*.sqlite) e o redact limpa os dois,
+relatando quanto saiu de cada um. Se o relatorio disser `PARTIAL`, ainda ha
+copia em disco - nao diga ao usuario que esta limpo. Se disser que a sessao
+foi pulada, o Codex pode estar escrevendo no banco agora: peca pra fechar e
+rodar de novo.
 
 ## Mostrar uso de tokens
 
