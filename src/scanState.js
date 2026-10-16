@@ -4,11 +4,12 @@
 const { ANSI, MARKER_SELECTED, padVisible, HIGHLIGHT } = require('./selector');
 const { t } = require('./i18n');
 
-// So achado de alta confianca numa sessao do Claude entra na lista
+// So achado de alta confianca num agente que o redact cobre entra na lista
 // selecionavel - mesma fronteira de seguranca que "--redact" ja respeita
 // (ver src/commands/scan.js: redactCandidates). O resto (media/baixa
-// confianca, ou alta confianca num agente que o redact ainda nao cobre)
-// aparece so pra revisar, nunca selecionavel.
+// confianca, ou agente sem redact) aparece so pra revisar, nunca selecionavel.
+const AGENTES_COM_REDACT = new Set(['claude', 'codex']);
+
 function flattenFindings(results) {
   const rows = [];
 
@@ -22,13 +23,14 @@ function flattenFindings(results) {
         dir: r.dir,
         mtime: r.mtime,
         filePath: r.filePath,
+        dbPath: r.dbPath || null,
         rule: f.rule,
         label: f.label,
         confidence: f.confidence,
         masked: f.masked,
         occurrences: f.occurrences,
         firstLine: f.firstLine,
-        redactable: r.agent === 'claude' && f.confidence === 'alta',
+        redactable: AGENTES_COM_REDACT.has(r.agent) && f.confidence === 'alta',
       });
     }
   }
@@ -136,7 +138,10 @@ function renderRow(state, row, selecionado) {
   const marcador = state.marked.has(row.key) ? '✓ ' : selecionado ? MARKER_SELECTED : '  ';
   const tagPlano = t(CONFIDENCE_TAG[row.confidence]).padEnd(5);
   const vezes = row.occurrences > 1 ? ` (${row.occurrences}x)` : '';
-  const metaPlano = `      ${row.agent} · ${row.title} · ${t('scan.lineLabel', { n: row.firstLine })}`;
+  // firstLine 0 = veio do titulo/resumo da sessao, nao de uma linha do
+  // arquivo (ver scanMetadata em scan/index.js).
+  const onde = row.firstLine > 0 ? t('scan.lineLabel', { n: row.firstLine }) : t('scan.metadataLabel');
+  const metaPlano = `      ${row.agent} · ${row.title} · ${onde}`;
 
   if (!selecionado) {
     const tag = paint(state, CONFIDENCE_COLOR[row.confidence], tagPlano);

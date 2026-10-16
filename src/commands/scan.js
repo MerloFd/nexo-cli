@@ -1,34 +1,41 @@
 const { scanSessions } = require('../scan');
-const { redactFile, isPossiblyActive } = require('../scan/redact');
+const { isPossiblyActive } = require('../scan/redact');
+const { redactSession } = require('../scan/redactSession');
 const { runInteractiveScan } = require('../scan/interactive');
 const { daysAgo } = require('../scanSessions');
 const { t } = require('../i18n');
 
-// Redact so cobre Claude por escolha de escopo, NAO por formato: o rollout do
-// Codex tambem e JSONL de uma linha por entrada, e redactFile() roda nele sem
-// corromper nada (verificado - segredo removido, toda linha segue JSON valido,
-// session_meta intacto). O que falta e que o mesmo segredo fica TAMBEM na
-// coluna first_user_message do state*.sqlite: redigir so o rollout deixaria
-// uma copia legivel no banco - e e justamente essa coluna que aparece como
-// resumo da sessao na lista. Cobrir o Codex de verdade exige redigir os dois
-// lugares e definir o que "possivelmente ativa" significa num banco em WAL,
-// onde o mtime do arquivo nao basta. Ver specs/003-codex-redact.
+const AGENTES_COM_REDACT = new Set(['claude', 'codex']);
+
+// Claude e Codex gravam a conversa em JSONL de uma linha por entrada, entao os
+// dois usam a mesma reescrita linha a linha. A diferenca e que no Codex o
+// segredo fica em DOIS lugares: o rollout e as colunas de texto do
+// state*.sqlite (first_user_message, que e justamente o que aparece como
+// resumo da sessao na lista). Limpar so um deixaria copia legivel no outro.
 function redactCandidates(results) {
   return results.filter(
-    (r) => r.agent === 'claude' && r.findings.some((f) => f.confidence === 'alta')
+    (r) => AGENTES_COM_REDACT.has(r.agent) && r.findings.some((f) => f.confidence === 'alta')
   );
 }
 
 function applyRedactions(results) {
   const candidatos = redactCandidates(results);
+  // A checagem de mtime continua valendo para os dois agentes: o lock do banco
+  // prova que ninguem escreve NESTE instante, nao que a sessao esta encerrada.
+  // As duas defesas somadas sao mais seguras que qualquer uma sozinha.
   const puladas = candidatos.filter((r) => isPossiblyActive(r.mtime));
   const alvo = candidatos.filter((r) => !isPossiblyActive(r.mtime));
 
-  const feitas = alvo
-    .map((r) => ({ result: r, outcome: redactFile(r.filePath) }))
-    .filter((entry) => entry.outcome.changed > 0 || entry.outcome.error);
+  const resultados = alvo.map((r) => ({ result: r, outcome: redactSession(r) }));
 
-  return { feitas, puladas };
+  // Banco ocupado nao e falha nem sucesso: e "tente de novo com o Codex
+  // fechado". Entra na mesma lista de puladas que o mtime alimenta.
+  const ocupadas = resultados.filter((e) => e.outcome.dbBusy).map((e) => e.result);
+  const feitas = resultados.filter(
+    (e) => !e.outcome.dbBusy && (e.outcome.changed > 0 || e.outcome.error || e.outcome.dbError)
+  );
+
+  return { feitas, puladas: [...puladas, ...ocupadas] };
 }
 
 function contar(results, confidence) {
@@ -56,7 +63,12 @@ function imprimirGrupo(results, confidence, titulo, nota) {
 
     for (const f of result.findings) {
       const vezes = f.occurrences > 1 ? ` (${f.occurrences}x)` : '';
-      console.log(`      ${f.label}: ${f.masked}${vezes}  ${t('scan.lineLabel', { n: f.firstLine })}`);
+      // firstLine 0 = o achado nao veio de uma linha do arquivo, veio do
+      // titulo/resumo (no Codex, uma coluna do banco). Dizer "linha 0"
+      // mandaria o usuario procurar no lugar errado.
+      const onde =
+        f.firstLine > 0 ? t('scan.lineLabel', { n: f.firstLine }) : t('scan.metadataLabel');
+      console.log(`      ${f.label}: ${f.masked}${vezes}  ${onde}`);
     }
 
     console.log(`    ${result.filePath}`);
@@ -97,6 +109,27 @@ function printReport(results) {
   }
 }
 
+// Uma sessao do Codex pode terminar em quatro estados diferentes, e o
+// relatorio tem que distinguir os quatro - "parcial" lido como sucesso e a
+// pior saida possivel aqui, porque o usuario pararia de procurar o segredo.
+function linhaDoResultado(outcome) {
+  if (outcome.partial) return t('scan.redact.partial', { message: outcome.error });
+  if (outcome.error) return t('cli.warning', { message: outcome.error });
+  if (outcome.dbError) return t('cli.warning', { message: outcome.dbError });
+
+  // Dois lugares limpos: diz quanto saiu de cada um, senao o numero somado
+  // esconde que o indice do Codex tambem guardava copia.
+  if (outcome.dbChanged > 0) {
+    return t('scan.redact.countSplit', {
+      n: outcome.changed,
+      rollout: outcome.rolloutChanged,
+      db: outcome.dbChanged,
+    });
+  }
+
+  return t('scan.redact.count', { n: outcome.changed });
+}
+
 function printRedactReport({ feitas, puladas }) {
   console.log('');
 
@@ -110,11 +143,7 @@ function printRedactReport({ feitas, puladas }) {
 
   for (const { result, outcome } of feitas) {
     const rotulo = result.title || result.sessionId.slice(0, 8);
-    if (outcome.error) {
-      console.log(`  ${rotulo}: ${t('cli.warning', { message: outcome.error })}`);
-    } else {
-      console.log(`  ${rotulo}: ${t('scan.redact.count', { n: outcome.changed })}`);
-    }
+    console.log(`  ${rotulo}: ${linhaDoResultado(outcome)}`);
   }
 
   if (puladas.length > 0) {
@@ -162,8 +191,16 @@ function printJson(results, redacted) {
         redacted: {
           sessions: redacted.feitas.map(({ result, outcome }) => ({
             sessionId: result.sessionId,
+            agent: result.agent,
             occurrencesRemoved: outcome.changed || 0,
-            error: outcome.error || null,
+            // Quebrado por destino so onde existem dois (Codex). Para o Claude
+            // fica null, em vez de repetir o total num campo que nao se aplica.
+            inSessionLog: outcome.dbChanged === undefined ? null : outcome.rolloutChanged,
+            inCodexIndex: outcome.dbChanged === undefined ? null : outcome.dbChanged,
+            // true quando o indice foi limpo e o log nao: ainda ha copia do
+            // segredo em disco, e quem consome este JSON precisa saber disso.
+            partial: Boolean(outcome.partial),
+            error: outcome.error || outcome.dbError || null,
           })),
           skippedPossiblyActive: redacted.puladas.map((r) => r.sessionId),
         },
@@ -181,7 +218,9 @@ function printJson(results, redacted) {
 function podeSerInterativo({ json, redact }, results) {
   if (json || redact) return false;
   if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
-  return results.some((r) => r.agent === 'claude' && r.findings.some((f) => f.confidence === 'alta'));
+  return results.some(
+    (r) => AGENTES_COM_REDACT.has(r.agent) && r.findings.some((f) => f.confidence === 'alta')
+  );
 }
 
 async function run(sessions, { json = false, redact = false } = {}) {

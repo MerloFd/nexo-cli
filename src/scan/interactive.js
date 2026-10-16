@@ -1,6 +1,7 @@
 const readline = require('readline');
 const { flattenFindings, createState, applyKey, render } = require('../scanState');
-const { redactFile, isPossiblyActive } = require('./redact');
+const { isPossiblyActive } = require('./redact');
+const { redactSession } = require('./redactSession');
 const { ALT_SCREEN_ON, ALT_SCREEN_OFF, CURSOR_HIDE, CURSOR_SHOW, frame } = require('../screen');
 
 // Cabecalho (3) + rodape (3) fixos fora da lista navegavel, e cada achado
@@ -13,11 +14,11 @@ function viewportFor(rows) {
   return Math.max(1, Math.floor(((rows || 24) - 6) / 2));
 }
 
-// Agrupa as chaves selecionadas por arquivo - uma sessao pode ter varios
-// achados marcados, e cada arquivo so deve ser reescrito uma vez. Sessao
+// Agrupa as chaves selecionadas por sessao - uma sessao pode ter varios
+// achados marcados, e cada sessao so deve ser limpa uma vez. Sessao
 // possivelmente ativa (mexida ha pouco) fica de fora, mesma protecao que
 // "--redact" ja aplica.
-function porArquivo(rows, keys) {
+function porSessao(rows, keys) {
   const grupos = new Map();
   const puladas = [];
 
@@ -25,8 +26,12 @@ function porArquivo(rows, keys) {
     const row = rows.find((r) => r.key === key);
     if (!row) continue;
 
-    if (!grupos.has(row.filePath)) grupos.set(row.filePath, { row, only: new Set() });
-    grupos.get(row.filePath).only.add(`${row.rule}|${row.masked}`);
+    // Agrupa por sessionId, nao por filePath: a unidade de redact e a SESSAO
+    // (que no Codex sao dois destinos - rollout e banco), e uma sessao do
+    // Codex sem rollout tem filePath null. Chavear por null fundia sessoes
+    // diferentes no mesmo grupo e a segunda era descartada em silencio.
+    if (!grupos.has(row.sessionId)) grupos.set(row.sessionId, { row, only: new Set() });
+    grupos.get(row.sessionId).only.add(`${row.rule}|${row.masked}`);
   }
 
   const alvo = [];
@@ -40,11 +45,18 @@ function porArquivo(rows, keys) {
 
 // Campo "result" (nao "row") de proposito: mesmo formato que
 // applyRedactions() ja produz em commands/scan.js, pra reusar
-// printRedactReport sem duplicar a logica de impressao.
+// printRedactReport sem duplicar a logica de impressao. A limpeza em si vem
+// de redactSession, o mesmo do --redact direto - inclusive o banco do Codex.
 function applyRedaction(rows, keys) {
-  const { alvo, puladas } = porArquivo(rows, keys);
-  const feitas = alvo.map(({ row, only }) => ({ result: row, outcome: redactFile(row.filePath, { only }) }));
-  return { feitas, puladas };
+  const { alvo, puladas } = porSessao(rows, keys);
+  const resultados = alvo.map(({ row, only }) => ({ result: row, outcome: redactSession(row, only) }));
+
+  // Banco ocupado nao e falha: e "tente de novo com o Codex fechado". Vai
+  // para a mesma lista de puladas que a checagem de mtime alimenta.
+  const ocupadas = resultados.filter((e) => e.outcome.dbBusy).map((e) => e.result);
+  const feitas = resultados.filter((e) => !e.outcome.dbBusy);
+
+  return { feitas, puladas: [...puladas, ...ocupadas] };
 }
 
 // Mesmo loop de tela alternativa + raw mode do seletor de sessoes e do

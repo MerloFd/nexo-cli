@@ -24,7 +24,7 @@ function resultado(overrides) {
   };
 }
 
-test('flattenFindings marca redactable so alta confianca em sessao claude', () => {
+test('flattenFindings marca redactable so alta confianca em agente com redact', () => {
   const results = [
     resultado(),
     resultado({
@@ -33,17 +33,24 @@ test('flattenFindings marca redactable so alta confianca em sessao claude', () =
       findings: [{ rule: 'aws-access-key', label: 'AWS', confidence: 'alta', masked: 'AKI***BB', occurrences: 1, firstLine: 1 }],
     }),
     resultado({
+      sessionId: 'id4',
+      // Agente sintetico: nao esta na lista dos que o redact cobre.
+      agent: 'outro',
+      findings: [{ rule: 'aws-access-key', label: 'AWS', confidence: 'alta', masked: 'AKI***CC', occurrences: 1, firstLine: 1 }],
+    }),
+    resultado({
       sessionId: 'id3',
       findings: [{ rule: 'assignment', label: 'Segredo', confidence: 'media', masked: 'abc***xyz', occurrences: 1, firstLine: 5 }],
     }),
   ];
 
   const rows = flattenFindings(results);
-  assert.strictEqual(rows.length, 3);
+  assert.strictEqual(rows.length, 4);
 
   const porId = Object.fromEntries(rows.map((r) => [r.sessionId, r]));
   assert.strictEqual(porId.id1.redactable, true, 'claude + alta = selecionavel');
-  assert.strictEqual(porId.id2.redactable, false, 'codex ainda nao suporta redact');
+  assert.strictEqual(porId.id2.redactable, true, 'codex + alta tambem - o redact cobre os dois');
+  assert.strictEqual(porId.id4.redactable, false, 'agente sem redact nunca e selecionavel');
   assert.strictEqual(porId.id3.redactable, false, 'media confianca nunca e selecionavel');
 });
 
@@ -65,7 +72,7 @@ test('toggleMark so marca linha redactable', () => {
     resultado(),
     resultado({
       sessionId: 'id2',
-      agent: 'codex',
+      agent: 'outro',
       findings: [{ rule: 'aws-access-key', label: 'AWS', confidence: 'alta', masked: 'AKI***BB', occurrences: 1, firstLine: 1 }],
     }),
   ]);
@@ -74,7 +81,7 @@ test('toggleMark so marca linha redactable', () => {
   const marcado = toggleMark(state, rows[0].key);
   assert.ok(marcado.marked.has(rows[0].key));
 
-  const naoMuda = toggleMark(state, rows.find((r) => r.agent === 'codex').key);
+  const naoMuda = toggleMark(state, rows.find((r) => r.agent === 'outro').key);
   assert.strictEqual(naoMuda.marked.size, 0, 'linha nao redactable nao marca');
 });
 
@@ -83,20 +90,20 @@ test('Tab marca e avanca, pulando quem nao e selecionavel sem travar', () => {
     resultado(),
     resultado({
       sessionId: 'id2',
-      agent: 'codex',
+      agent: 'outro',
       findings: [{ rule: 'aws-access-key', label: 'AWS', confidence: 'alta', masked: 'AKI***BB', occurrences: 1, firstLine: 1 }],
     }),
     resultado({ sessionId: 'id3' }),
   ]);
   let state = createState(rows, { viewport: 5 });
 
-  state = markAndAdvance(state); // marca id1 (alta), vai pro id2 (codex, nao redactable)
+  state = markAndAdvance(state); // marca id1 (alta), vai pro id2 (agente sem redact)
   assert.strictEqual(state.index, 1);
   assert.strictEqual(state.marked.size, 1);
 
   state = markAndAdvance(state); // tenta marcar id2 (nao entra), avanca pro id3
   assert.strictEqual(state.index, 2);
-  assert.strictEqual(state.marked.size, 1, 'codex nao marcou');
+  assert.strictEqual(state.marked.size, 1, 'agente sem redact nao marcou');
 });
 
 test('Enter sem nada marcado age sobre a linha destacada, se for redactable', () => {
@@ -110,7 +117,7 @@ test('Enter sem nada marcado age sobre a linha destacada, se for redactable', ()
 
 test('Enter sobre linha nao redactable, sem nada marcado, nao faz nada', () => {
   const rows = flattenFindings([
-    resultado({ agent: 'codex' }),
+    resultado({ agent: 'outro' }),
   ]);
   const state = createState(rows, { viewport: 5 });
 

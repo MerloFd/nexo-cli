@@ -112,4 +112,11 @@ function redactFile(filePath, { only = null } = {}) {
   return { changed: mudancas };
 }
 
-module.exports = { redactFile, isPossiblyActive, findSecretsInValue, redactObject, IDLE_MS };
+module.exports = {
+  redactFile,
+  isPossiblyActive,
+  findSecretsInValue,
+  redactValue,
+  redactObject,
+  IDLE_MS,
+};

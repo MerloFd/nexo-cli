@@ -114,3 +114,28 @@ test('viewportFor divide por 2 - cada achado ocupa duas linhas de tela', () => {
   assert.strictEqual(viewportFor(24), 9);
   assert.ok(viewportFor(50) * 2 + 6 <= 50, 'o espaço usado pela lista nunca estoura a altura do terminal');
 });
+
+// Regressao: o agrupamento era por filePath, e uma sessao do Codex sem rollout
+// tem filePath null. Duas dessas caiam no mesmo grupo (chave null) e a segunda
+// era descartada em silencio - o usuario marcava duas e so uma era limpa, sem
+// nada no relatorio. A unidade de redact e a SESSAO, nao o arquivo.
+test('duas sessoes sem filePath nao colapsam no mesmo grupo', () => {
+  const sessao = (id, masked) => ({
+    sessionId: id,
+    agent: 'codex',
+    dir: 'C:\DEV',
+    title: `S${id}`,
+    filePath: null,
+    dbPath: path.join(os.tmpdir(), 'nexo-nao-existe.sqlite'),
+    mtime: Date.now() - 3600000,
+    findings: [
+      { rule: 'aws-access-key', label: 'AWS', confidence: 'alta', masked, occurrences: 1, firstLine: 0 },
+    ],
+  });
+
+  const rows = flattenFindings([sessao('id1', 'AKI***AA'), sessao('id2', 'AKI***BB')]);
+  const { feitas } = applyRedaction(rows, rows.map((r) => r.key));
+
+  assert.strictEqual(feitas.length, 2, 'as duas sessoes sao processadas');
+  assert.deepStrictEqual(feitas.map((e) => e.result.sessionId).sort(), ['id1', 'id2']);
+});
