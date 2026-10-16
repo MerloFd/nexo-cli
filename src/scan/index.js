@@ -95,6 +95,35 @@ async function scanFile(filePath, { maxLineLength = 20000 } = {}) {
   return findings;
 }
 
+// O titulo e o resumo nao vem do arquivo: no Codex vem das colunas de texto
+// do state*.sqlite. Isso cria um ponto cego real - se o rollout foi rotacionado
+// ou apagado e a linha do banco ficou, varrer so o arquivo reportaria "nada
+// encontrado" enquanto a lista do nexo exibe a credencial na tela como resumo
+// da sessao. Pior que nao achar: achar e dizer que esta limpo.
+//
+// Nao tem numero de linha porque nao e um arquivo; line 0 marca isso, e o
+// relatorio troca "linha N" por "no titulo/resumo".
+function scanMetadata(session) {
+  const campos = [session.title, session.summary].filter((v) => typeof v === 'string' && v);
+  const findings = [];
+
+  for (const texto of campos) {
+    for (const hit of matchRules(texto)) {
+      findings.push({
+        line: 0,
+        rule: hit.rule,
+        label: hit.label,
+        confidence: hit.confidence || 'media',
+        masked: mask(hit.value),
+        length: String(hit.value).length,
+        inMetadata: true,
+      });
+    }
+  }
+
+  return findings;
+}
+
 // Um mesmo segredo costuma aparecer dezenas de vezes na mesma sessao (o
 // agente relê o arquivo, o usuario repete a mensagem). Agrupar evita um
 // relatorio de 300 linhas para dois segredos.
@@ -106,7 +135,12 @@ function groupFindings(findings) {
     const acc = groups.get(key);
     if (acc) {
       acc.occurrences++;
-      acc.firstLine = Math.min(acc.firstLine, f.line);
+      // line 0 e o marcador de "veio do metadado, nao de uma linha" - um
+      // Math.min cru o escolheria sempre e o relatorio diria "no titulo"
+      // mesmo para um segredo que tambem esta no arquivo. Fica com a menor
+      // linha REAL, e inMetadata guarda a outra metade da informacao.
+      if (f.line > 0) acc.firstLine = acc.firstLine > 0 ? Math.min(acc.firstLine, f.line) : f.line;
+      if (f.inMetadata) acc.inMetadata = true;
     } else {
       groups.set(key, {
         rule: f.rule,
@@ -116,6 +150,7 @@ function groupFindings(findings) {
         length: f.length,
         occurrences: 1,
         firstLine: f.line,
+        inMetadata: Boolean(f.inMetadata),
       });
     }
   }
@@ -151,7 +186,12 @@ async function scanSessions(sessions, { onProgress, cacheFile = SCAN_CACHE_FILE 
     }
 
     if (onProgress) onProgress(session);
+    // So o resultado do ARQUIVO entra no cache: a chave e mtime+tamanho dele,
+    // e o metadado vive fora do arquivo (no banco do Codex), entao mudaria sem
+    // a chave mudar. Varrer duas strings curtas nao vale um cache proprio.
     if (key) cacheNovo.set(key, { findings });
+
+    findings = [...findings, ...scanMetadata(session)];
     if (findings.length === 0) continue;
 
     results.push({
@@ -160,6 +200,9 @@ async function scanSessions(sessions, { onProgress, cacheFile = SCAN_CACHE_FILE 
       dir: session.dir,
       title: session.title || null,
       filePath: session.filePath,
+      // So o Codex traz isto: o redact dele precisa limpar tambem as colunas
+      // de texto do state*.sqlite, nao so o rollout.
+      dbPath: session.dbPath || null,
       mtime: session.mtime,
       findings: groupFindings(findings),
     });
@@ -169,4 +212,4 @@ async function scanSessions(sessions, { onProgress, cacheFile = SCAN_CACHE_FILE 
   return results.sort((a, b) => b.mtime - a.mtime);
 }
 
-module.exports = { scanSessions, scanFile, groupFindings, mask, matchRules, SCAN_CACHE_FILE };
+module.exports = { scanSessions, scanFile, scanMetadata, groupFindings, mask, matchRules, SCAN_CACHE_FILE };
